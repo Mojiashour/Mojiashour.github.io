@@ -187,3 +187,9 @@ body{overflow-x:clip}
 .hero .kw .social a{transition:color .2s,transform .2s}
 .hero .kw .social a:hover,.hero .kw .social a:focus-visible{color:var(--ink);transform:translateY(-2px)}
 .hero .kw .social .mail:hover{text-decoration:underline;text-underline-offset:3px}
+@media (max-width:860px){
+.hero .side{display:contents}
+.hero .lab{order:0}.hero h1{order:1;top:0}.hero .kw{order:2;top:0;margin-top:8px}
+.hero .lab .m3{font-size:clamp(96px,30vw,150px)}
+.hero .lab .mmm{margin-bottom:8px}
+}
