@@ -164,3 +164,26 @@ body{overflow-x:clip}
 .hero h1{position:relative;top:-7px}
 .hero .kw p{font-size:12.5px;line-height:1.7;color:#9a9a9a;letter-spacing:.01em}
 .hero .kw .social{margin-top:12px}.hero .kw .social svg{width:15px;height:15px}.hero .kw .social a{color:#a8a8a8}.hero .kw .social .mail{font-size:12px}
+/* aura background */
+.hero{position:relative;isolation:isolate}
+.aura{position:absolute;z-index:-1;top:-120px;bottom:0;left:calc(50% - 50vw);width:100vw;overflow:hidden;pointer-events:none;
+ -webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent);mask-image:linear-gradient(to bottom,#000 70%,transparent)}
+.aura i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55;will-change:transform}
+.aura i:nth-child(1){width:46vw;height:46vw;left:-10vw;top:-8vw;background:#c9d6c2;animation:drift1 26s ease-in-out infinite alternate}
+.aura i:nth-child(2){width:40vw;height:40vw;right:-8vw;top:-12vw;background:#ecd3bf;animation:drift2 30s ease-in-out infinite alternate}
+.aura i:nth-child(3){width:38vw;height:38vw;left:30vw;top:18vw;background:#cfd9e3;animation:drift3 34s ease-in-out infinite alternate}
+.aura i:nth-child(4){width:30vw;height:30vw;right:12vw;top:22vw;background:#e3c7c3;opacity:.4;animation:drift1 38s ease-in-out infinite alternate-reverse}
+@keyframes drift1{to{transform:translate(8vw,6vw) scale(1.1)}}
+@keyframes drift2{to{transform:translate(-10vw,8vw) scale(.92)}}
+@keyframes drift3{to{transform:translate(6vw,-8vw) scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.aura i{animation:none}}
+.nav{background:transparent;backdrop-filter:none;transition:background .3s}
+.nav.scrolled{background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
+.menu nav a{background:transparent}
+.aura i{opacity:.8}.aura i:nth-child(4){opacity:.6}
+/* mono aura */
+.aura i:nth-child(1){background:#d4d4d4}.aura i:nth-child(2){background:#e2e2e2}.aura i:nth-child(3){background:#c8c8c8}.aura i:nth-child(4){background:#dadada}
+.aura i{opacity:.7}.aura i:nth-child(4){opacity:.5}
+.hero .kw .social a{transition:color .2s,transform .2s}
+.hero .kw .social a:hover,.hero .kw .social a:focus-visible{color:var(--ink);transform:translateY(-2px)}
+.hero .kw .social .mail:hover{text-decoration:underline;text-underline-offset:3px}
