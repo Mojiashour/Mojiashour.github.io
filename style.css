@@ -318,3 +318,15 @@ body:has(.proj) .navin{grid-template-columns:300px minmax(0,1fr)}
 .seeall a{font-size:14px;color:#111;text-decoration:none;border-bottom:1px solid #111;padding-bottom:2px;transition:opacity .2s}
 .seeall a span{display:inline-block;transition:transform .2s}
 .seeall a:hover span{transform:translateX(4px)}
+/* v24 mobile project list at end */
+.pmore{display:none}
+@media (max-width:860px){
+.page.proj .pnav{display:none}
+.pmore{display:block;border-top:1px solid var(--line);padding-top:32px;padding-bottom:8px;margin-top:40px}
+.pmore h2{font-size:28px;margin-bottom:16px}
+.pmore ol{list-style:none}
+.pmore li a{display:flex;gap:12px;padding:8px 0;font-size:15px;line-height:1.35;color:#9a9a9a;text-decoration:none}
+.pmore li a:hover,.pmore li a:focus-visible{color:var(--ink)}
+.pmore .pn{font-size:12px;min-width:18px;padding-top:2px}
+.pmore a[aria-current=page]{color:var(--ink);font-weight:600}
+}
