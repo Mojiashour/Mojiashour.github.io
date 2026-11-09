@@ -1,25 +1,26 @@
 /**
- * Wayfinding SPA v4.3 — full session: intro, consent, today's-state questions, questionnaires, practice,
+ * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
  * a MIST-style stress induction (Dedovic et al., 2005; original HTML/JS, not Inquisit) before each
  * wayfinding condition, Nature + Poster(Abstract) conditions on the FINAL 6000x3000 renders, a short
  * corridor-transition animation after each left/right choice, per-block stress sliders, a debrief
  * (comparison bar was not real) then a single end-of-session performance summary (Part 1 / Part 2,
  * no condition names), post-experiment measures, export.
  * Trial logic (mulberry32 seed, 3 blocks x 14 trials per condition, 3 lag-3 recall probes per block, board
- * table seed 20261007, CSV columns) is unchanged from v3 apart from what is listed in README_v4.3.md.
+ * table seed 20261007, CSV columns) is unchanged from v3 apart from what is listed in README_v4.4.md.
  *
  * URL options (combine with &)
  *   ?mode=lab | remote        lab = EEG/ECG marker hook + experimenter setup/rest screens (default remote)
  *   ?pid=TEST_ABC            optional study code (testing); otherwise auto-assigned / lab typed
  *   ?seed=12345               participant randomisation seed (default random, logged)
  *   ?order=NA | AN            condition order (default: derived from a hash bit of the random participant ID)
- *   ?res=6k | 4k              panorama derivative (hosted default 4k = 4096x2048; 6k only if those assets are present)
+ *   ?res=6k | 4k              panorama derivative (default 6k = 6000x3000 JPEG; 4k = 4096x2048)
  *   ?trialsPerBlock=4         pilot / debugging (default 14)
- *   ?mistSec=180              duration of each MIST experimental segment in seconds (default 180)
+ *   ?mistSec=90               duration of each MIST experimental segment in seconds (default 90)
  *   ?mistPracticeSec=40       untimed MIST practice at first use only (default 40; 0 skips practice)
  *   ?mistAvg=85               fixed "average performance" marker, 80–90 (default 85)
  *   ?mistMsg=1                brief negative-evaluative messages between MIST sub-segments (default off)
- *   ?trans=800                corridor-transition duration in ms (default 800; 0 disables)
+ *   ?trans=2200               total exit+entry corridor transition in ms (default 2200 walking pace; 0 disables)
+ *   ?fov=102                  horizontal field of view in degrees (default 102; was 90 in v4.3)
  *   ?prep=1                   use the legacy anticipatory-prep screen instead of MIST
  *   ?prepSec=45               duration of that legacy prep screen (default 45; the old 120 s default is gone)
  *   ?liveStress=1             use the legacy live serial-subtraction module (failure feedback) instead of MIST
@@ -49,7 +50,7 @@
   const modeParam = (params.get("mode") || "remote").toLowerCase();
   const mode = modeParam === "lab" ? "lab" : "remote";
   const DEBUG = params.get("debug") === "1";
-  const RES = params.get("res") === "6k" ? "6k" : "4k"; // hosted default 4k
+  const RES = params.get("res") === "6k" ? "6k" : "4k"; // hosted/default 4k
 
   function stressModeFromParams() {
     if (params.get("liveStress") === "1") return "live";
@@ -64,7 +65,7 @@
     PROBES_PER_BLOCK: 3,
     PROBE_MIN_SPACING: 3,
     TRIALS_PER_BLOCK: num("trialsPerBlock", 14),
-    HFOV: 90,
+    HFOV: Math.max(70, Math.min(140, num("fov", 102))), // v4.4: zoomed out vs 90°; ?fov= overrides
     START_YAW: 0,
     START_PITCH: 0,
     ABSTRACT_MODE: ["placeholder", "disabled"].includes(params.get("abstract")) ? params.get("abstract") : "real",
@@ -88,17 +89,20 @@
     SHOW_SUMMARY: params.get("summary") !== "0", // shown once at the end, never after each condition
     STRESS_MODE: stressModeFromParams(), // default mist; ?prep=1 or ?liveStress=1 select the legacy modules
     PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
-    MIST_S: num("mistSec", 180),
+    MIST_S: num("mistSec", 90), // v4.4 default 90 s
     MIST_PRACTICE_S: num("mistPracticeSec", 40),
     MIST_AVG: Math.max(80, Math.min(90, num("mistAvg", 85))),
     MIST_EVAL_MESSAGES: params.get("mistMsg") === "1",
-    TRANS_MS: num("trans", 800), // 0 disables the corridor transition
-    TRANS_YAW: num("transYaw", 40),
-    TRANS_HFOV: num("transHfov", 54),
-    TRANS_BOB: num("transBob", 1.35),
+    // v4.4 two-sided walking transition: ?trans= is TOTAL exit+entry duration (~2–2.5 s default).
+    TRANS_MS: num("trans", 2200), // 0 disables both halves
+    TRANS_YAW: num("transYaw", 32), // exit turn amplitude
+    TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)), // mid zoom (~78% of base)
+    TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
+    TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
+    TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
-    WORDING_VERSION: "DRAFT_IRB_2026-11-09_v43",
+    WORDING_VERSION: "DRAFT_IRB_2026-11-09_v44",
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
       LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
   };
@@ -177,6 +181,7 @@
   let surveyRnd = null;
   let eventSeq = 0;
   let fadeCovered = false;   // white overlay is fully up after a corridor exit, waiting for the next scene
+  let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
     appVersion: "v4.3",
@@ -263,7 +268,7 @@
   function autosave(reason) {
     if (!session.participantId) return Promise.resolve(lastSave);
     const json = JSON.stringify(session);
-    try { localStorage.setItem("wf_v42_" + session.participantId, json); } catch (e) { /* quota: ignore */ }
+    try { localStorage.setItem("wf_v44_" + session.participantId, json); } catch (e) { /* quota: ignore */ }
     const meta = {
       appVersion: session.appVersion, startedAt: session.startedAt, completedAt: session.completedAt || "",
       endReason: session.endReason || "", reason, savedAt: isoNow(),
@@ -629,6 +634,7 @@
     setPanoBlur(0);
     setOverlayOpacity(0);
     fadeCovered = false;
+    transitionBusy = false;
     if (pano) pano.interactive = true;
   }
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -647,22 +653,27 @@
     await Promise.all(need);
     return { waited: Math.round(performance.now() - t0) };
   }
-  /** Turn + zoom + fade to white after a left/right choice. RT has already been recorded. */
+  /** Exit half: walk forward (yaw + zoom-in), blur and fade out. RT already stamped at key press. */
   async function playExitTransition(choice) {
     const dur = CONFIG.TRANS_MS;
     const next = peekNextEvent();
     const preload = await ensureEventAssets(next);
+    setDecisionUI(false);
+    choiceEnabled = false;
     if (!dur || dur <= 0 || !pano) {
       fadeCovered = false;
+      transitionBusy = false;
       const pad = 150 - preload.waited;
       if (pad > 0) await sleep(pad);
       return { disabled: 1, preload_wait_ms: preload.waited };
     }
-    const outMs = Math.max(120, Math.round(dur * 0.72));
+    transitionBusy = true;
+    const outMs = Math.max(160, Math.round(dur * (CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC)));
     const t0 = performance.now();
     logEvent("transition_start", {
-      choice: choice, duration_ms: dur, out_ms: outMs,
+      choice: choice, duration_ms: dur, out_ms: outMs, phase: "out",
       nextKind: next && next.kind || "", preload_wait_ms: preload.waited,
+      base_hfov: CONFIG.HFOV, mid_hfov: CONFIG.TRANS_HFOV,
     });
     pano.interactive = false;
     const targetYaw = choice === "left" ? -CONFIG.TRANS_YAW : CONFIG.TRANS_YAW;
@@ -671,47 +682,84 @@
     try {
       await pano.animateTo({
         yaw: targetYaw, pitch: 0, hfov: CONFIG.TRANS_HFOV,
-        duration: outMs, bobAmp: CONFIG.TRANS_BOB, bobCycles: 2,
+        duration: outMs, bobAmp: CONFIG.TRANS_BOB, bobCycles: CONFIG.TRANS_BOB_CYCLES,
+        ease: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
       }, (t) => {
-        const b = Math.max(0, Math.min(1, (t - 0.18) / 0.65));
-        setPanoBlur(5.5 * b);
-        const f = Math.max(0, Math.min(1, (t - 0.52) / 0.48));
+        const b = Math.max(0, Math.min(1, (t - 0.18) / 0.72));
+        setPanoBlur(3.2 * b);
+        const f = Math.max(0, Math.min(1, (t - 0.50) / 0.50));
         setOverlayOpacity(f * f);
       });
     } catch (err) {
       console.error("[transition]", err);
     }
-    setPanoBlur(0);
+    setPanoBlur(3.2);
     setOverlayOpacity(1);
     fadeCovered = true;
     logEvent("transition_end", {
       choice: choice, elapsed_ms: Math.round(performance.now() - t0),
       phase: "out", preload_wait_ms: preload.waited,
     });
-    return { disabled: 0, preload_wait_ms: preload.waited, elapsed_ms: Math.round(performance.now() - t0) };
+    return { disabled: 0, preload_wait_ms: preload.waited, elapsed_ms: Math.round(performance.now() - t0), out_ms: outMs };
   }
-  /** Fade the white overlay out to reveal the scene already shown underneath. */
+
+  /**
+   * Entry half (mirrors exit): new scene is already loaded under the white overlay at mid FOV.
+   * Ease out to base FOV while blur clears and the overlay fades in, with a small settling bob.
+   * Choice keys stay ignored until this resolves; decision_onset is scheduled by the caller afterward.
+   */
   async function playEnterTransition() {
-    if (!fadeCovered) return;
-    const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 800;
-    const inMs = Math.max(80, Math.round(dur * 0.28));
+    if (!fadeCovered) { transitionBusy = false; return { skipped: 1 }; }
+    const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
+    const outFrac = CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC;
+    const inMs = Math.max(160, Math.round(dur * (1 - outFrac)));
     const t0 = performance.now();
-    setPanoBlur(0);
-    await new Promise((resolve) => {
-      const start = performance.now();
-      const step = (now) => {
-        const t = Math.min(1, (now - start) / inMs);
-        const e = 1 - (1 - t) * (1 - t);
-        setOverlayOpacity(1 - e);
-        if (t < 1) requestAnimationFrame(step);
-        else resolve();
-      };
-      requestAnimationFrame(step);
+    transitionBusy = true;
+    setDecisionUI(false);
+    choiceEnabled = false;
+    if (pano) {
+      pano.interactive = false;
+      // Ensure we start from the mid zoom / forward view under the cover
+      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.TRANS_HFOV);
+    }
+    setPanoBlur(3.2);
+    setOverlayOpacity(1);
+    const overlay = transOverlay();
+    if (overlay) overlay.classList.add("on");
+    logEvent("transition_start", {
+      phase: "in", duration_ms: dur, in_ms: inMs,
+      base_hfov: CONFIG.HFOV, mid_hfov: CONFIG.TRANS_HFOV,
     });
+    try {
+      if (pano) {
+        await pano.animateTo({
+          yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: CONFIG.HFOV,
+          duration: inMs,
+          bobAmp: CONFIG.TRANS_BOB * 0.7,
+          bobCycles: Math.max(1.2, CONFIG.TRANS_BOB_CYCLES * 0.7),
+          ease: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+        }, (t) => {
+          const b = Math.max(0, 1 - Math.min(1, (t - 0.05) / 0.75));
+          setPanoBlur(3.2 * b);
+          const f = Math.max(0, 1 - Math.min(1, (t - 0.08) / 0.70));
+          setOverlayOpacity(f * f);
+        });
+      } else {
+        await sleep(inMs);
+      }
+    } catch (err) {
+      console.error("[transition-in]", err);
+    }
+    setPanoBlur(0);
     setOverlayOpacity(0);
     fadeCovered = false;
-    if (pano) pano.interactive = true;
-    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in" });
+    transitionBusy = false;
+    if (pano) {
+      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+      pano.interactive = true;
+    }
+    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in", in_ms: inMs });
+    return { skipped: 0, in_ms: inMs, elapsed_ms: Math.round(performance.now() - t0) };
   }
 
   function startDecisionTrial(spec) {
@@ -736,16 +784,30 @@
     const be = spec.boardId ? v.cache.get(boardUrl(spec.boardId)) : null;
     const go = (pe2, be2) => {
       $("loading-overlay").classList.remove("visible", "error");
-      v.show(pe2, be2, { yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: CONFIG.HFOV }).then(async (tFrame) => {
+      // If we are mid-corridor (white cover up), reveal from mid FOV; else open at base FOV.
+      const entering = !!fadeCovered;
+      const startHfov = entering ? CONFIG.TRANS_HFOV : CONFIG.HFOV;
+      setDecisionUI(false);
+      choiceEnabled = false;
+      v.show(pe2, be2, { yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: startHfov }).then(async (tFrame) => {
         if (currentEvent !== spec) return;
-        if (fadeCovered) await playEnterTransition();
+        if (entering) await playEnterTransition();
         if (currentEvent !== spec) return;
+        // Scene is fully visible only after entry finishes (or immediately if no transition).
         sceneOnsetPerf = performance.now();
-        pushMarker("scene_onset", { renderId: spec.renderId, boardId: spec.boardId, frame_perf: +tFrame.toFixed(1) });
+        pushMarker("scene_onset", {
+          renderId: spec.renderId, boardId: spec.boardId, frame_perf: +tFrame.toFixed(1),
+          entered_via_transition: entering ? 1 : 0, hfov: CONFIG.HFOV,
+        });
+        // Decision-latency clock starts only once the new scene is fully visible.
         decisionTimer = setTimeout(() => {
+          if (currentEvent !== spec || transitionBusy) return;
           decisionOnsetPerf = performance.now();
           setDecisionUI(true);
-          pushMarker("decision_onset", { renderId: spec.renderId, boardId: spec.boardId, condition: spec.condition });
+          pushMarker("decision_onset", {
+            renderId: spec.renderId, boardId: spec.boardId, condition: spec.condition,
+            note: "rt_clock_starts_after_entry_visible",
+          });
         }, CONFIG.DECISION_DELAY_MS);
       });
     };
@@ -1575,7 +1637,7 @@
   }
   function exportFiles() {
     const pid = session.participantId || "unknown";
-    const pre = `wayfinding_v43_${pid}_`;
+    const pre = `wayfinding_v44_${pid}_`;
     return {
       [pre + "session.json"]: JSON.stringify(session, null, 2),
       [pre + "trials.csv"]: sessionToCsv(session),
@@ -1594,6 +1656,8 @@
       if (k === " " || k === "enter") { e.preventDefault(); dismissIntro(); }
       return;
     }
+    // Ignore left/right during the corridor exit+entry (RT for the new trial starts only after entry).
+    if (transitionBusy || fadeCovered) return;
     if (!choiceEnabled) return;
     if (k === "arrowleft" || k === "a") {
       e.preventDefault();
@@ -1605,7 +1669,6 @@
   }
 
   function init() {
-    // Remote participants must pass participate.html gate (sessionStorage). Lab / local testing skips it.
     if (mode === "remote") {
       try {
         if (sessionStorage.getItem("wf_gate_ok") !== "1") {
@@ -1617,7 +1680,7 @@
         return;
       }
     }
-    $("header-meta").textContent = `v4.3 · mode: ${mode} · ${CONFIG.RES}`;
+    $("header-meta").textContent = `v4.4 · mode: ${mode} · ${CONFIG.RES}`;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
     document.addEventListener("visibilitychange", () => {
@@ -1650,7 +1713,7 @@
     if ($("btn-restart")) $("btn-restart").addEventListener("click", () => location.reload());
     if ($("btn-fallback-download")) $("btn-fallback-download").addEventListener("click", () => {
       const files = exportFiles();
-      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v43_" + (session.participantId || "data") + "_session.json");
+      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v44_" + (session.participantId || "data") + "_session.json");
       downloadBlob(name, files[name] || JSON.stringify(session, null, 2), "application/json");
     });
     document.addEventListener("keydown", onKeyDown);
@@ -1665,7 +1728,7 @@
         get lastSave() { return lastSave; }, conditionPerformance, stressRows, summaryRows, collectSummaries,
         playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent };
     }
-    console.log("[wayfinding v4.3] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.4] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS });
     runSession().catch((err) => { console.error("[session]", err); logEvent("session_error", { message: String(err && err.message) }); });

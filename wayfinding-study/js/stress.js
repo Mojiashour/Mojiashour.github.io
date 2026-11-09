@@ -53,24 +53,27 @@
   };
 
   const MIST_DEFAULTS = {
-    DURATION_S: 180,
+    DURATION_S: 90,           // v4.4: shorter segment (was 180); ?mistSec overrides
     PRACTICE_S: 40,
     AVERAGE_PCT: 85,
-    LIMIT_FACTOR: 0.90,       // about 10% below the practice mean/median RT
-    LIMIT_MIN_MS: 650,
-    LIMIT_MAX_MS: 7000,
-    DEFAULT_MEAN_RT_MS: 3000,
-    ADAPT_CORRECT_STREAK: 2,
+    LIMIT_FACTOR: 1.00,       // v4.4: start at practice median RT (not 10% below)
+    LIMIT_MIN_MS: 4000,       // absolute floor ~4 s
+    LIMIT_MAX_MS: 14000,
+    DEFAULT_MEAN_RT_MS: 5000, // gentler fallback when practice RTs are sparse
+    ADAPT_CORRECT_STREAK: 3,  // slower adaptation
     ADAPT_ERROR_STREAK: 2,
-    ADAPT_DOWN: 0.90,         // shorten limit after a correct streak
-    ADAPT_UP: 1.12,           // lengthen after an error streak
+    ADAPT_DOWN: 0.96,         // smaller steps when shortening
+    ADAPT_UP: 1.06,           // smaller steps when lengthening
     ACC_LOW: 0.20,
     ACC_HIGH: 0.45,
     ACC_WINDOW: 8,
-    ACC_TIGHTEN: 0.88,
-    ACC_LOOSEN: 1.14,
+    ACC_TIGHTEN: 0.95,
+    ACC_LOOSEN: 1.08,
+    // 1.5× minimum sensible solve time by level (ms), then max'd with LIMIT_MIN_MS
+    LEVEL_FLOOR_MS: { 1: 1800, 2: 2500, 3: 3200, 4: 4000, 5: 4800 },
+    LEVEL_FLOOR_FACTOR: 1.5,
     FEEDBACK_MS: 700,
-    START_LEVEL: 3,
+    START_LEVEL: 2,           // start a bit milder; ramp via adaptation
     PRACTICE_LEVEL_MAX: 2,
     MIN_LEVEL: 1,
     MAX_LEVEL: 5,
@@ -214,20 +217,22 @@
       ["4 + 4", 8], ["7 − 3", 4], ["1 + 6", 7], ["9 − 8", 1], ["5 + 3", 8],
     ],
     2: [
-      ["12 − 8", 4], ["4 × 2", 8], ["18 ÷ 3", 6], ["25 − 19", 6], ["3 × 3", 9],
-      ["45 − 38", 7], ["16 ÷ 2", 8], ["7 × 1", 7], ["63 ÷ 9", 7], ["31 − 27", 4],
+      ["12 + 5 − 9", 8], ["18 − 7 − 6", 5], ["9 + 8 − 12", 5], ["15 − 4 − 8", 3],
+      ["6 + 7 − 9", 4], ["14 − 9 + 3", 8], ["20 − 8 − 7", 5], ["11 + 6 − 10", 7],
     ],
     3: [
-      ["12 + 5 − 9", 8], ["3 × 6 − 10", 8], ["(15 − 7) × 1", 8], ["24 ÷ 4 + 1", 7],
-      ["18 − 9 − 6", 3], ["5 × 3 − 8", 7], ["(9 + 7) ÷ 2", 8], ["14 + 8 − 19", 3],
+      ["3 × 6 − 10", 8], ["5 × 3 − 8", 7], ["4 × 4 − 9", 7], ["2 × 9 − 11", 7],
+      ["7 × 3 − 14", 7], ["6 × 2 − 5", 7], ["(9 + 7) × 1 − 8", 8], ["3 × 5 − 6", 9],
     ],
     4: [
-      ["(12 + 8) ÷ 4 − 1", 4], ["3 × 7 − 10 − 5", 6], ["(18 − 6) ÷ 3 + 1", 5],
-      ["4 × 8 − 20 − 5", 7], ["(9 × 3 + 3) ÷ 6", 5], ["15 + 9 − 8 − 9", 7],
+      ["(12 + 8) ÷ 4 − 1", 4], ["24 ÷ 4 + 1", 7], ["(18 − 6) ÷ 3 + 1", 5],
+      ["(9 × 3 + 3) ÷ 6", 5], ["45 ÷ 9 + 2", 7], ["(16 + 8) ÷ 3 − 1", 7],
+      ["72 ÷ 8 − 3", 6], ["(21 − 5) ÷ 4 + 1", 5],
     ],
     5: [
       ["(24 × 3 − 48) ÷ 6", 4], ["(18 + 14) × 2 − 60", 4], ["(45 − 18) ÷ 9 + 5", 8],
-      ["(16 × 4 − 28) ÷ 9", 4], ["(13 + 17) × 3 − 84", 6], ["(72 ÷ 8 + 5) × 1 − 5", 9],
+      ["(16 × 4 − 28) ÷ 9", 4], ["(13 + 17) × 3 − 84", 6], ["(72 ÷ 8 + 5) − 5", 9],
+      ["(9 × 4 − 12) ÷ 6 + 1", 5], ["(32 + 16) ÷ 8 × 1 + 1", 7],
     ],
   };
 
@@ -237,28 +242,54 @@
     return { expr: pair[0], answer: pair[1], level: lvl, source: "fallback" };
   }
 
+  function treeHasOp(node, op) {
+    if (!node || node.type === "num") return false;
+    return node.op === op || treeHasOp(node.l, op) || treeHasOp(node.r, op);
+  }
+
   /**
-   * Generate one problem at `level` (1–5). `rng` is a () => [0,1) function.
-   * Returns { expr, answer, level, source }.
+   * Generate one problem at `level` (1–5), Dedovic-style difficulty.
+   * L1 two numbers +/−; L2 three numbers +/−; L3 includes ×; L4 includes ÷;
+   * L5 four numbers with mixed ops and parentheses. Answer is always 0–9.
    */
   function generateProblem(level, rng) {
     const rnd = rng || Math.random;
     const lvl = clamp(level | 0, 1, 5);
-    const nOps = lvl === 1 ? 1 : lvl === 2 ? 1 : lvl === 3 ? 2 : lvl === 4 ? 3 : rngInt(rnd, 3, 4);
-    const allowMulDiv = lvl >= 2;
-    const numMin = lvl <= 1 ? 1 : lvl === 2 ? 2 : lvl === 3 ? 2 : 3;
-    const numMax = lvl <= 1 ? 9 : lvl === 2 ? 24 : lvl === 3 ? 40 : 99;
-    for (let attempt = 0; attempt < 30; attempt++) {
+    const specs = {
+      1: { nOps: 1, allowMulDiv: false, requireMul: false, requireDiv: false, numMin: 1, numMax: 9 },
+      2: { nOps: 2, allowMulDiv: false, requireMul: false, requireDiv: false, numMin: 1, numMax: 24 },
+      3: { nOps: 2, allowMulDiv: true,  requireMul: true,  requireDiv: false, numMin: 2, numMax: 40 },
+      4: { nOpsMin: 2, nOpsMax: 3, allowMulDiv: true,  requireMul: false, requireDiv: true,  numMin: 2, numMax: 72 },
+      5: { nOpsMin: 3, nOpsMax: 3, allowMulDiv: true, requireMul: false, requireDiv: false, preferMixed: true, numMin: 3, numMax: 99 },
+    };
+    const s = specs[lvl];
+    for (let attempt = 0; attempt < 50; attempt++) {
       const ans = rngInt(rnd, 0, 9);
-      // For level 1 prefer +/− only (allowMulDiv false).
-      const tree = buildTree(ans, nOps, rnd, numMin, numMax, allowMulDiv);
+      const nOps = s.nOps != null ? s.nOps : rngInt(rnd, s.nOpsMin, s.nOpsMax);
+      // For L3/L4 bias invertOptions toward required ops by temporarily forcing allowMulDiv
+      const tree = buildTree(ans, nOps, rnd, s.numMin, s.numMax, !!s.allowMulDiv);
       if (!tree || tree.type !== "op") continue;
       const val = evalNode(tree);
       if (val !== ans || !Number.isInteger(val) || val < 0 || val > 9) continue;
       const nums = leafValues(tree, []);
       if (nums.some((n) => n < 0 || n > 99 || !Number.isInteger(n))) continue;
       if (opCount(tree) < 1) continue;
-      // Prefer non-trivial: at least one operand > 1
+      if (s.requireMul && !treeHasOp(tree, "×")) continue;
+      if (s.requireDiv && !treeHasOp(tree, "÷")) continue;
+      if (s.preferMixed) {
+        const ops = [];
+        (function collect(n) {
+          if (!n || n.type === "num") return;
+          ops.push(n.op); collect(n.l); collect(n.r);
+        })(tree);
+        const uniq = new Set(ops);
+        if (uniq.size < 2) continue; // want mixed ops at L5
+        if (!treeHasOp(tree, "×") && !treeHasOp(tree, "÷")) continue;
+        if (nums.length < 4) continue;
+      }
+      if (lvl === 1 && treeHasOp(tree, "×")) continue;
+      if (lvl === 1 && treeHasOp(tree, "÷")) continue;
+      if (lvl === 2 && (treeHasOp(tree, "×") || treeHasOp(tree, "÷"))) continue;
       if (nums.every((n) => n <= 1) && lvl > 1) continue;
       return { expr: fmtNode(tree, 0), answer: ans, level: lvl, source: "gen" };
     }
@@ -266,6 +297,7 @@
   }
 
   /* ---------------- anticipatory prep (legacy) ---------------- */
+
   function runPrep(host, cfg, onEvent) {
     const C = Object.assign({ DURATION_S: 45, variant: "first", wordingVersion: WORDING_VERSION }, cfg || {});
     const copy = PREP_COPY[C.variant] || PREP_COPY.first;
@@ -478,9 +510,22 @@
     return btns.join("");
   }
 
+  function levelFloorMs(level, C) {
+    const floors = C.LEVEL_FLOOR_MS || {};
+    const sensible = floors[clamp(level | 0, 1, 5)] || 2500;
+    const factor = C.LEVEL_FLOOR_FACTOR == null ? 1.5 : C.LEVEL_FLOOR_FACTOR;
+    return Math.max(C.LIMIT_MIN_MS, Math.round(sensible * factor));
+  }
+
+  function clampLimit(ms, level, C) {
+    const lo = levelFloorMs(level, C);
+    return clamp(Math.round(ms), lo, C.LIMIT_MAX_MS);
+  }
+
   function initialLimit(state, C) {
     const base = (state && state.practiceRtMs) || C.DEFAULT_MEAN_RT_MS;
-    return clamp(Math.round(base * C.LIMIT_FACTOR), C.LIMIT_MIN_MS, C.LIMIT_MAX_MS);
+    const level = (state && state.lastLevel) || C.START_LEVEL;
+    return clampLimit(base * C.LIMIT_FACTOR, level, C);
   }
 
   function runMist(host, cfg, onEvent) {
@@ -618,28 +663,30 @@
         if (correct) {
           streakOk++; streakBad = 0;
           if (streakOk >= C.ADAPT_CORRECT_STREAK) {
-            limit = clamp(limit * C.ADAPT_DOWN, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS);
             if (level < C.MAX_LEVEL) level += 1;
+            limit = clampLimit(limit * C.ADAPT_DOWN, level, C);
             streakOk = 0;
           }
         } else {
           streakBad++; streakOk = 0;
           if (streakBad >= C.ADAPT_ERROR_STREAK) {
-            limit = clamp(limit * C.ADAPT_UP, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS);
             if (level > C.MIN_LEVEL) level -= 1;
+            limit = clampLimit(limit * C.ADAPT_UP, level, C);
             streakBad = 0;
           }
         }
         const acc = recentAcc();
         if (acc != null && responses.length >= 4) {
           if (acc > C.ACC_HIGH) {
-            limit = clamp(limit * C.ACC_TIGHTEN, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS);
             if (level < C.MAX_LEVEL) level = Math.min(C.MAX_LEVEL, level + 1);
+            limit = clampLimit(limit * C.ACC_TIGHTEN, level, C);
           } else if (acc < C.ACC_LOW) {
-            limit = clamp(limit * C.ACC_LOOSEN, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS);
             if (level > C.MIN_LEVEL) level = Math.max(C.MIN_LEVEL, level - 1);
+            limit = clampLimit(limit * C.ACC_LOOSEN, level, C);
           }
         }
+        // Always re-apply the level floor after level changes
+        limit = clampLimit(limit, level, C);
         void timeout;
       };
 
