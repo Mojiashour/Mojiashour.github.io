@@ -184,7 +184,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.3",
+    appVersion: "v4.4",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -1350,7 +1350,8 @@
     await page(`<h2>${copy.title}</h2>${copy.html}`, [{ id: "go", label: "Continue" }], { cls: "debrief-page" });
     session.stress.debriefShown = true;
     logEvent("debrief_shown", { wordingVersion: CONFIG.WORDING_VERSION, stressMode: CONFIG.STRESS_MODE });
-    autosave("debrief");
+    // Await so this checkpoint cannot race/overwrite the final "complete" save on Drive.
+    await autosave("debrief");
   }
 
   function fmtLatency(s) { return s == null ? "—" : s.toFixed(2) + " s"; }
@@ -1377,17 +1378,73 @@
       </div>`;
   }
 
-  /** Build (and record) Part 1 / Part 2 summaries without revealing condition names. */
-  function collectSummaries(conds) {
-    const nParts = conds.length;
-    const cards = [];
-    conds.forEach((cond, i) => {
-      const already = session.summaries.find((s) => s.condition === cond && s.conditionPosition === i + 1);
-      const stats = already || conditionPerformance(cond, i + 1);
-      if (!already) session.summaries.push(stats);
-      cards.push(performanceCardHTML(stats, i + 1, nParts));
+  /** Overall stats across both conditions (own data only). */
+  function overallPerformance() {
+    const dec = session.trials.filter((t) => t.trialType === "decision" && !t.isPractice);
+    const probes = session.trials.filter((t) => t.trialType === "recall_probe");
+    const nCorrect = dec.filter((t) => t.accuracy === 1).length;
+    const nDec = dec.length;
+    const meanMs = nDec ? dec.reduce((s, t) => s + t.rt_ms, 0) / nDec : null;
+    const nProbeOk = probes.filter((t) => t.accuracy === 1).length;
+    return {
+      scope: "overall",
+      condition: "Overall",
+      conditionName: "Overall",
+      conditionPosition: 0,
+      n_decisions: nDec,
+      n_correct: nCorrect,
+      pct_correct: pct(nCorrect, nDec),
+      mean_decision_latency_s: meanMs != null ? r2(meanMs / 1000) : null,
+      n_probes: probes.length,
+      n_probes_correct: nProbeOk,
+      pct_probes_correct: pct(nProbeOk, probes.length),
+      blocks: [],
+    };
+  }
+
+  /**
+   * Fill session.summaries with: 1 overall row, 1 row per condition (with blocks[]),
+   * and 1 row per destination block. Safe to call more than once (rebuilds).
+   */
+  function ensureSummaries(conds) {
+    const list = (conds && conds.length) ? conds : condsFromPlan();
+    const rows = [overallPerformance()];
+    list.forEach((cond, i) => {
+      const stats = conditionPerformance(cond, i + 1);
+      rows.push(Object.assign({ scope: "condition" }, stats));
+      (stats.blocks || []).forEach((b, bi) => {
+        rows.push({
+          scope: "block",
+          condition: cond,
+          conditionName: (COND_LABEL[cond] || cond) + " · " + (b.destination || ("Block " + (bi + 1))),
+          conditionPosition: i + 1,
+          n_decisions: b.n_decisions,
+          n_correct: b.n_correct,
+          pct_correct: b.pct_correct,
+          mean_decision_latency_s: b.mean_decision_latency_s,
+          n_probes: b.n_probes,
+          n_probes_correct: b.n_probes_correct,
+          pct_probes_correct: b.pct_probes_correct,
+          blocks: [b],
+          block: b.block,
+          blockOrder: b.blockOrder,
+          destination: b.destination || "",
+        });
+      });
     });
-    return cards.join("");
+    session.summaries = rows;
+    return list;
+  }
+
+  /** Build Part 1 / Part 2 HTML cards (no condition names shown) and ensure summaries are stored. */
+  function collectSummaries(conds) {
+    const list = ensureSummaries(conds);
+    const nParts = list.length;
+    return list.map((cond, i) => {
+      const stats = session.summaries.find((s) => s.scope === "condition" && s.condition === cond && s.conditionPosition === i + 1)
+        || conditionPerformance(cond, i + 1);
+      return performanceCardHTML(stats, i + 1, nParts);
+    }).join("");
   }
 
   async function stepCondition(c, pos, later, nParts) {
@@ -1522,13 +1579,17 @@
       // The full MIST/IRB debrief is its own screen (stepDebrief), shown before these results.
       debrief.innerHTML = "";
     }
+    // Always compute & store summaries (overall + per condition + per block) before the final save,
+    // even if the on-screen cards are hidden.
+    const conds = condsFromPlan();
+    ensureSummaries(conds);
     if (results) {
       if (CONFIG.SHOW_SUMMARY && reason === "completed" && decisions.length) {
-        const conds = condsFromPlan();
         results.innerHTML = collectSummaries(conds);
-        logEvent("performance_summary_shown", { at: "end", nParts: conds.length });
+        logEvent("performance_summary_shown", { at: "end", nParts: conds.length, nSummaryRows: session.summaries.length });
       } else {
         results.innerHTML = "";
+        logEvent("performance_summary_stored", { at: "end", shown: 0, nSummaryRows: session.summaries.length });
       }
     }
 
@@ -1541,13 +1602,15 @@
       <div><strong>Test decisions:</strong> ${decisions.length} · accuracy ${nAcc}/${decisions.length} · mean RT ${meanRt} ms</div>
       <div><strong>Recall probes:</strong> ${probes.length} · accuracy ${nProbeAcc}/${probes.length}</div>
       <div><strong>Questionnaire items:</strong> ${session.responses.length} · administrations ${session.scores.length}</div>
+      <div><strong>Summaries:</strong> ${session.summaries.length} rows · completedAt <code>${escapeHtml(session.completedAt || "")}</code></div>
       <div><strong>Stress:</strong> mode <code>${CONFIG.STRESS_MODE}</code> · MIST items ${((session.stress.mist && session.stress.mist.practice && session.stress.mist.practice.responses) || []).length + (session.stress.mist && session.stress.mist.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · preps ${session.stress.preps.length} · live answers ${(session.stress.live && session.stress.live.responses || []).length} · end-math answers ${(session.stress.endMath && session.stress.endMath.responses || []).length} · events ${session.events.length}</div>`;
       if ($("log-preview")) $("log-preview").value = JSON.stringify(session, null, 2);
     }
     showScreen("end");
     const status = $("end-save-status");
     if (status) { status.className = "save-status"; status.textContent = "Saving your responses…"; }
-    Promise.resolve(autosave("end")).then((res) => {
+    // Final Drive/local save: reason "complete" with completedAt, endReason, and summaries populated.
+    Promise.resolve(autosave("complete")).then((res) => {
       const row = $("end-fallback-row");
       if (res && res.ok) {
         if (status) {
@@ -1597,8 +1660,8 @@
   const STRESS_HEADERS = ["participantId", "task", "phase", "variant", "idx", "difficulty", "level", "problem",
     "previous", "expected", "given", "correct", "timeout", "feedback", "rt_ms", "limit_ms", "next_limit_ms", "next_level",
     "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
-  const SUMMARY_HEADERS = ["participantId", "condition", "conditionName", "conditionPosition", "n_decisions", "n_correct",
-    "pct_correct", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
+  const SUMMARY_HEADERS = ["participantId", "scope", "condition", "conditionName", "conditionPosition", "block", "blockOrder", "destination",
+    "n_decisions", "n_correct", "pct_correct", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
   function stressRows() {
     const rows = [];
     const add = (res, task) => {
@@ -1725,7 +1788,7 @@
         get choiceEnabled() { return choiceEnabled; }, get queueLength() { return eventQueue.length; }, get phase() { return currentPhase; },
         preloaded: () => preloadPromise, BOARDS, NATURE_RENDERS, ABSTRACT_RENDERS, ensureViewer, panoUrl, boardUrl,
         autofill: () => window.WFSurvey.autofill(pageHost()), dismissIntro, get serverOk() { return serverOk; },
-        get lastSave() { return lastSave; }, conditionPerformance, stressRows, summaryRows, collectSummaries,
+        get lastSave() { return lastSave; }, conditionPerformance, overallPerformance, ensureSummaries, stressRows, summaryRows, collectSummaries,
         playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent };
     }
     console.log("[wayfinding v4.4] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
