@@ -1,0 +1,30 @@
+Sign typography report  (seed 20261007, generator 1.5.0, style referenceA)
+Typeface: Source Sans 3 v3.052 (SIL OFL), open-licensed substitute for Myriad (WF-201); rows Regular 400, Exit Bold 700, header SemiBold 600
+Board format panel: 1200 x 1371 mm (47.2 x 54.0 in), final-render sign panel, layout 700 x 800 px; 1 layout px = 1.7143 mm; PNG 1400x1600 = 1.167 px/mm
+
+Row cap height (I): 60.0 mm = 2.36 in = 35.0 layout px = 70.0 PNG px  (font size 53 layout px)
+Line pitch (baseline to baseline): 101.9 mm = 1.70 x cap  (ADA 703.5.9: 1.35-1.70)
+Letter spacing: tracking 5.1 mm = 0.085 x cap, added to the font's own side bearings; measured letter gaps: rows 10.2-34.8 %, Exit 18.9-21.1 %, header 17.4-29.2 % of cap (ADA 703.5.8: 10-35 %)
+Stroke of "I": Regular 12.7 %, SemiBold 17.7 %, Bold 22.5 % of cap (ADA 703.5.7: 10-30 %); "O" width / "I" height: 85.5 % Regular (ADA 703.5.4: 55-110 %)
+Module x (WF-271 B6 / WF-204): 78.0 mm = 90.9 PNG px; arrow box 78.0 mm square, stroke 20.3 mm
+Header "LEVEL N" cap: 64.5 mm = 2.54 in; header height 132.0 mm
+Rows block aligned: center (spare panel height split above and below)
+Row cap limits for this format: >= 51 mm on every line (ADA 703.5.5 2 in minimum for baselines 70-120 in AFF, so no row depends on its height), <= 64 mm; header cap 64 mm. Row cap OK.
+
+ADA Table 703.5.5 per line, sign bottom edge at 1140 mm (44.88 in) above the floor.
+Viewing distance per ADA = distance to the nearest obstruction; a viewer can walk up to this wall, so < 72 in applies.
+line          baseline AFF          min cap (ADA)   actual   result
+header        2412 mm (94.96 in)      51 mm           64.5 mm  PASS
+row 1         2222 mm (87.47 in)      51 mm           60.0 mm  PASS
+row 2         2120 mm (83.45 in)      51 mm           60.0 mm  PASS
+row 3         2018 mm (79.44 in)      51 mm           60.0 mm  PASS
+row 4         1916 mm (75.43 in)      51 mm           60.0 mm  PASS
+row 5         1814 mm (71.41 in)      51 mm           60.0 mm  PASS
+row 6         1712 mm (67.40 in)      16 mm           60.0 mm  PASS
+row 7         1610 mm (63.39 in)      16 mm           60.0 mm  PASS
+row 8         1508 mm (59.37 in)      16 mm           60.0 mm  PASS
+row 9         1406 mm (55.36 in)      16 mm           60.0 mm  PASS
+Exit          1247 mm (49.10 in)      16 mm           60.0 mm  PASS
+
+If the 360 reading distance (3500-4000 mm) were used as the ADA viewing distance for lines at 40-70 in: min cap 33.5-38.8 mm (5/8 in + 1/8 in per ft over 6 ft).
+All lines meet Table 703.5.5.

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Participate in Research | Moji Ashour</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="Participate in a research study on wayfinding in healthcare environments.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20">
+  <style>
+    /* Study gate page — matches site palette; self-contained extras only */
+    .part-main{min-height:100vh;padding:120px 40px 80px}
+    .part-inner{max-width:560px;margin:0 auto}
+    .part-kicker{font-size:13px;color:var(--mute);letter-spacing:.04em;text-transform:uppercase;margin-bottom:18px}
+    .part-main h1{font-size:clamp(36px,5vw,56px);line-height:1.02;font-weight:700;letter-spacing:-.035em;margin-bottom:48px}
+    .part-card{border:1px solid var(--line);border-radius:16px;padding:32px 28px;background:#fff}
+    .part-card h2{font-size:clamp(22px,2.4vw,28px);line-height:1.2;font-weight:600;letter-spacing:-.02em;margin-bottom:14px}
+    .part-card p{color:var(--mute);font-size:16px;line-height:1.55;margin-bottom:14px}
+    .part-meta{font-size:14px;color:var(--mute);margin-bottom:22px}
+    .part-meta span{display:inline-block;margin-right:14px}
+    .part-field{margin:18px 0 8px}
+    .part-field label{display:block;font-size:13px;font-weight:500;margin-bottom:8px}
+    .part-field input{width:100%;font:500 16px var(--sans);padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fafafa;color:var(--ink)}
+    .part-field input:focus{outline:2px solid var(--ink);outline-offset:2px;background:#fff}
+    .part-err{color:#a11;font-size:14px;min-height:1.2em;margin:8px 0 14px}
+    .part-btn{font:600 15px var(--sans);background:var(--ink);color:#fff;border:0;border-radius:999px;padding:12px 22px;cursor:pointer}
+    .part-btn:hover{opacity:.9}
+    .part-btn:disabled{opacity:.5;cursor:wait}
+    .part-note{margin-top:28px;font-size:13px;color:var(--mute)}
+    .part-note a{color:var(--ink)}
+    @media (max-width:640px){.part-main{padding:100px 20px 60px}.part-card{padding:24px 18px}}
+  </style>
+</head>
+<body>
+  <header class="nav"><div class="wrap navin"><a class="brand" href="/">Moji Ashour</a></div></header>
+  <main class="part-main">
+    <div class="part-inner">
+      <p class="part-kicker">Research participation</p>
+      <h1>Participate in <em>Research</em></h1>
+      <article class="part-card">
+        <h2>Wayfinding Intersection Study</h2>
+        <p>This online study looks at how people choose a direction at hospital corridor intersections. You will view a series of intersections on screen and select left or right, and answer a few brief questions about how you feel and how you find your way.</p>
+        <p class="part-meta"><span>~30–45 minutes</span><span>Desktop or laptop with a keyboard</span><span>Chrome recommended</span></p>
+        <div class="part-field">
+          <label for="study-pw">Study access code</label>
+          <input id="study-pw" type="password" autocomplete="off" maxlength="64" placeholder="Enter the code you were given">
+        </div>
+        <p class="part-err" id="study-err" aria-live="polite"></p>
+        <button type="button" class="part-btn" id="study-start">Start</button>
+      </article>
+      <p class="part-note">Nothing that identifies you is collected. You are known in the data only by a study code. Questions: <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a></p>
+    </div>
+  </main>
+  <footer class="wrap foot"><span>&copy; 2026 Moji Ashour</span><a href="/">Home</a></footer>
+  <script>
+  (function () {
+    // Client-side gate only (not a security boundary). Compare SHA-256, never the plaintext.
+    var EXPECT = "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab";
+    var input = document.getElementById("study-pw");
+    var err = document.getElementById("study-err");
+    var btn = document.getElementById("study-start");
+
+    function hex(buf) {
+      return Array.from(new Uint8Array(buf)).map(function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    }
+    function sha256(text) {
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(hex);
+    }
+    function go() {
+      err.textContent = "";
+      var pw = (input.value || "").trim();
+      if (!pw) { err.textContent = "Please enter the access code."; return; }
+      btn.disabled = true;
+      sha256(pw).then(function (h) {
+        if (h !== EXPECT) {
+          err.textContent = "That code does not match. Please try again.";
+          btn.disabled = false;
+          return;
+        }
+        try { sessionStorage.setItem("wf_gate_ok", "1"); } catch (e) {}
+        location.href = "/wayfinding-study/?mode=remote";
+      }).catch(function () {
+        err.textContent = "Could not verify the code in this browser. Please try Chrome.";
+        btn.disabled = false;
+      });
+    }
+    btn.addEventListener("click", go);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); go(); }
+    });
+  })();
+  </script>
+</body>
+</html>

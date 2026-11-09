@@ -1,0 +1,12 @@
+{
+ "generator": "sign-generator 1.5.0",
+ "format": "panel",
+ "physicalSize": "1200 x 1371 mm (47.2 x 54.0 in), final-render sign panel",
+ "png": "1400x1600",
+ "aspect": 0.875,
+ "fontSizeLayoutPx": 53,
+ "capMm": 60,
+ "fontSizeMainOnly": 53,
+ "nBoards": 86,
+ "seed": "20261007"
+}

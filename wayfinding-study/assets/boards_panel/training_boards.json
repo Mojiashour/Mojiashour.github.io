@@ -1,0 +1,198 @@
+[
+ {
+  "board_id": "TRN_T3_Admissions_corrL",
+  "condition": "Training",
+  "condition_code": "TRN",
+  "block": 0,
+  "destination": "Admissions",
+  "dest_level": "G",
+  "header_level": "G",
+  "cell_no": 1,
+  "cell_id": "TRN_T3_Admissions_corrL",
+  "layout": "none",
+  "cue_type": "none",
+  "sign_on_cue": "no",
+  "extra_cue_side": "none",
+  "correct_side": "left",
+  "congruence": "n/a",
+  "target_row": 4,
+  "n_rows": 9,
+  "n_lines": 10,
+  "n_right_arrows": 5,
+  "n_left_arrows": 5,
+  "extra_arrow_side": "none",
+  "wayout_arrow": "right",
+  "lines": [
+   {
+    "text": "Blood Bank",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Library",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Security",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Admissions",
+    "arrow": "left",
+    "level": null,
+    "is_target": true,
+    "is_wayout": false
+   },
+   {
+    "text": "Social Work",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Volunteer Services",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Staff Lounge",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Respiratory Therapy",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Interpreter Services",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Exit",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": true
+   }
+  ],
+  "png_file": "TRN_T3_Admissions_corrL.png",
+  "seed": "20261007"
+ },
+ {
+  "board_id": "TRN_T4_Admissions_corrR",
+  "condition": "Training",
+  "condition_code": "TRN",
+  "block": 0,
+  "destination": "Admissions",
+  "dest_level": "G",
+  "header_level": "G",
+  "cell_no": 1,
+  "cell_id": "TRN_T4_Admissions_corrR",
+  "layout": "none",
+  "cue_type": "none",
+  "sign_on_cue": "no",
+  "extra_cue_side": "none",
+  "correct_side": "right",
+  "congruence": "n/a",
+  "target_row": 7,
+  "n_rows": 9,
+  "n_lines": 10,
+  "n_right_arrows": 5,
+  "n_left_arrows": 5,
+  "extra_arrow_side": "none",
+  "wayout_arrow": "right",
+  "lines": [
+   {
+    "text": "Library",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Security",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Staff Lounge",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Blood Bank",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Respiratory Therapy",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Social Work",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Admissions",
+    "arrow": "right",
+    "level": null,
+    "is_target": true,
+    "is_wayout": false
+   },
+   {
+    "text": "Interpreter Services",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Volunteer Services",
+    "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Exit",
+    "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": true
+   }
+  ],
+  "png_file": "TRN_T4_Admissions_corrR.png",
+  "seed": "20261007"
+ }
+]

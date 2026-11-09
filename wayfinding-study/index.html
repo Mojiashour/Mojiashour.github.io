@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="data:," />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wayfinding Study v4.3</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="lab-banner" role="status">LAB MODE — markers stub</div>
+  <div id="file-protocol-warn" class="protocol-warn" hidden role="alert">
+    This page was opened as a local file (<code>file://</code>). Panoramas will not load.
+    Run <code>python3 tools/server.py</code> in the wayfinding-spa folder and open
+    <code>http://localhost:8080/</code> instead.
+  </div>
+
+  <header class="app-bar">
+    <h1>Hospital Wayfinding · v4.3</h1>
+    <div class="meta" id="header-meta">mode: —</div>
+  </header>
+
+  <main>
+    <!-- Generic page host: setup, consent, questionnaires, stress task, rest, experimenter screens -->
+    <section id="screen-page" class="screen active wide" aria-label="Study page">
+      <div id="page-host"><p class="hint">Loading…</p></div>
+    </section>
+
+    <!-- Instructions -->
+    <section id="screen-instructions" class="screen" aria-label="Instructions">
+      <h2>Instructions</h2>
+      <p class="instr-lead">In this section, you are asked to find a destination inside a hospital environment. Remember that you can:</p>
+      <ol class="instr-list">
+        <li>Look around with your mouse.</li>
+        <li>
+          Choose directions with your keyboard.
+          <div class="key-visual" aria-hidden="true">
+            <div class="key-combo"><kbd class="key-cap">←</kbd><span>Left</span></div>
+            <div class="key-combo"><kbd class="key-cap">→</kbd><span>Right</span></div>
+          </div>
+        </li>
+        <li>Please make your selection (right or left) as soon as you can.</li>
+        <li>Please stay focused.</li>
+        <li>This is a serious data collection effort. Do not close this window or switch to another window during the experiment.</li>
+      </ol>
+      <p class="hint protocol-warn" id="preload-status" hidden></p>
+      <div class="btn-row">
+        <button type="button" id="btn-to-practice" disabled>Loading…</button>
+      </div>
+    </section>
+
+    <!-- Trial (windowed pano + bottom instruction zone) -->
+    <section id="screen-trial" class="screen" aria-label="Trial">
+      <div class="trial-layout">
+        <div class="trial-chrome">
+          <span class="badge" id="trial-badge">Trial</span>
+          <span class="badge" id="trial-hint">Drag to look · then press ← or →</span>
+        </div>
+        <div id="task-header" class="task-header">Hospital Wayfinding Task</div>
+        <div id="progress" class="progress" aria-label="Progress">
+          <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          <span class="progress-label" id="progress-label">0%</span>
+        </div>
+
+        <div id="pano-frame" class="pano-frame">
+          <div id="pano-wrap">
+            <div id="pano"></div>
+            <div id="loading-overlay" class="loading-overlay">Loading scene…</div>
+            <div id="transition-overlay" aria-hidden="true"></div>
+            <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
+              <span id="placeholder-text" class="placeholder-text">Recall probe</span>
+              <span id="placeholder-sub" class="placeholder-sub"></span>
+              <button type="button" class="intro-btn" id="btn-intro-continue">Continue</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="instruction-zone" class="instruction-zone" aria-live="polite">
+          <!-- Decision mode -->
+          <div id="decision-panel" class="response-panel">
+            <p class="prompt-large" id="decision-prompt">Press ← or → to choose your direction.</p>
+            <p class="bottom-line" id="decision-sub">You can look around with the mouse, and press ← or → to make a decision to turn.</p>
+            <div class="choice-row">
+              <button type="button" class="choice-btn" id="btn-left" disabled>←</button>
+              <button type="button" class="choice-btn" id="btn-right" disabled>→</button>
+            </div>
+            <p class="key-hint" id="decision-key-hint">Waiting… look around first</p>
+          </div>
+
+          <!-- Block intro (new destination) -->
+          <div id="intro-panel" class="response-panel" hidden>
+            <p class="prompt-large" id="intro-prompt">Your destination</p>
+            <p class="prompt-sub" id="intro-sub"></p>
+          </div>
+
+          <!-- Recall probe mode -->
+          <div id="probe-panel" class="response-panel" hidden>
+            <p class="bottom-line" id="probe-bottom">Press ← or → to answer.</p>
+            <p class="prompt-large visually-hidden" id="probe-prompt">Which way did you turn 3 intersections ago?</p>
+            <div class="choice-row">
+              <button type="button" class="choice-btn" id="btn-probe-left" disabled>←</button>
+              <button type="button" class="choice-btn" id="btn-probe-right" disabled>→</button>
+            </div>
+            <p class="key-hint" id="probe-key-hint">Waiting…</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- End: participant results / debrief, plus experimenter tools when in lab or debug -->
+    <section id="screen-end" class="screen participant-end" aria-label="Session complete">
+      <div id="end-participant">
+        <h2>Session complete</h2>
+        <p id="end-thanks">Thank you.</p>
+        <div id="end-debrief" class="debrief-block"></div>
+        <div id="end-results"></div>
+        <p id="end-save-status" class="save-status"></p>
+        <div class="btn-row" id="end-fallback-row" hidden>
+          <button type="button" id="btn-fallback-download">Download your data</button>
+        </div>
+      </div>
+      <div id="end-experimenter" hidden>
+        <h3>Experimenter</h3>
+        <p class="hint">These download buttons and the log preview are shown only in lab mode or <code>?debug=1</code>. They are hidden from online participants. Data are also kept in this browser's local storage, and saved to <code>data/</code> when run with <code>tools/server.py</code> or a configured backend.</p>
+        <div class="summary" id="end-summary"></div>
+        <div class="btn-row">
+          <button type="button" id="btn-download-json">Download JSON</button>
+          <button type="button" class="secondary" id="btn-download-csv">Trials CSV</button>
+          <button type="button" class="secondary" id="btn-download-q">Questionnaires CSV</button>
+          <button type="button" class="secondary" id="btn-download-scores">Scores CSV</button>
+          <button type="button" class="secondary" id="btn-download-events">Events CSV</button>
+          <button type="button" class="secondary" id="btn-download-stress">Stress task CSV</button>
+          <button type="button" class="secondary" id="btn-download-summaries">Summaries CSV</button>
+          <button type="button" class="ghost" id="btn-restart">New session</button>
+        </div>
+        <label class="hint" for="log-preview" style="display:block;margin-top:1.25rem;">Session log preview</label>
+        <textarea id="log-preview" readonly spellcheck="false"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/stimuli.js"></script>
+  <script src="js/instruments.js"></script>
+  <script src="js/survey.js"></script>
+  <script src="js/stress.js"></script>
+  <script src="js/backend.js"></script>
+  <script type="module" src="js/pano3d.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
