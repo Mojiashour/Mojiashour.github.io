@@ -98,6 +98,7 @@
     TRANS_YAW: num("transYaw", 32), // exit turn amplitude
     TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)), // exit mid zoom (~78% of base)
     // Entry starts slightly WIDE then narrows to base FOV (continues forward motion; not zoom-out/backwards).
+    /* v4.4-forward-entry */
     TRANS_ENTER_HFOV: num("transEnterHfov", Math.min(140, Math.round(Math.max(70, Math.min(140, num("fov", 102))) + 14))),
     TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
     TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
