@@ -96,7 +96,9 @@
     // v4.4 two-sided walking transition: ?trans= is TOTAL exit+entry duration (~2–2.5 s default).
     TRANS_MS: num("trans", 2200), // 0 disables both halves
     TRANS_YAW: num("transYaw", 32), // exit turn amplitude
-    TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)), // mid zoom (~78% of base)
+    TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)), // exit mid zoom (~78% of base)
+    // Entry starts slightly WIDE then narrows to base FOV (continues forward motion; not zoom-out/backwards).
+    TRANS_ENTER_HFOV: num("transEnterHfov", Math.min(140, Math.round(Math.max(70, Math.min(140, num("fov", 102))) + 14))),
     TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
     TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
     TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
@@ -704,8 +706,9 @@
   }
 
   /**
-   * Entry half (mirrors exit): new scene is already loaded under the white overlay at mid FOV.
-   * Ease out to base FOV while blur clears and the overlay fades in, with a small settling bob.
+   * Entry half: new scene loads under the white overlay starting slightly WIDE (base FOV + ~14°),
+   * faded and blurred, then narrows to base FOV while fading in and sharpening — continues forward
+   * motion (not zooming out / backing up). Exit half is unchanged (narrow mid zoom).
    * Choice keys stay ignored until this resolves; decision_onset is scheduled by the caller afterward.
    */
   async function playEnterTransition() {
@@ -713,14 +716,15 @@
     const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
     const outFrac = CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC;
     const inMs = Math.max(160, Math.round(dur * (1 - outFrac)));
+    const enterHfov = CONFIG.TRANS_ENTER_HFOV != null ? CONFIG.TRANS_ENTER_HFOV : Math.min(140, CONFIG.HFOV + 14);
     const t0 = performance.now();
     transitionBusy = true;
     setDecisionUI(false);
     choiceEnabled = false;
     if (pano) {
       pano.interactive = false;
-      // Ensure we start from the mid zoom / forward view under the cover
-      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.TRANS_HFOV);
+      // Start wide under the cover, then walk forward into base FOV
+      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, enterHfov);
     }
     setPanoBlur(3.2);
     setOverlayOpacity(1);
@@ -728,7 +732,7 @@
     if (overlay) overlay.classList.add("on");
     logEvent("transition_start", {
       phase: "in", duration_ms: dur, in_ms: inMs,
-      base_hfov: CONFIG.HFOV, mid_hfov: CONFIG.TRANS_HFOV,
+      base_hfov: CONFIG.HFOV, enter_hfov: enterHfov, exit_mid_hfov: CONFIG.TRANS_HFOV,
     });
     try {
       if (pano) {
@@ -758,7 +762,7 @@
       pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
       pano.interactive = true;
     }
-    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in", in_ms: inMs });
+    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in", in_ms: inMs, enter_hfov: enterHfov });
     return { skipped: 0, in_ms: inMs, elapsed_ms: Math.round(performance.now() - t0) };
   }
 
@@ -784,9 +788,11 @@
     const be = spec.boardId ? v.cache.get(boardUrl(spec.boardId)) : null;
     const go = (pe2, be2) => {
       $("loading-overlay").classList.remove("visible", "error");
-      // If we are mid-corridor (white cover up), reveal from mid FOV; else open at base FOV.
+      // If mid-corridor, start slightly WIDE then narrow to base (forward); else open at base FOV.
       const entering = !!fadeCovered;
-      const startHfov = entering ? CONFIG.TRANS_HFOV : CONFIG.HFOV;
+      const startHfov = entering
+        ? (CONFIG.TRANS_ENTER_HFOV != null ? CONFIG.TRANS_ENTER_HFOV : Math.min(140, CONFIG.HFOV + 14))
+        : CONFIG.HFOV;
       setDecisionUI(false);
       choiceEnabled = false;
       v.show(pe2, be2, { yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: startHfov }).then(async (tFrame) => {
