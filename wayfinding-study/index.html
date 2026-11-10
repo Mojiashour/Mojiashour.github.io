@@ -82,7 +82,7 @@
           </div>
         </li>
         <li>Please make your selection (right or left) as soon as you can.</li>
-        <li id="instr-decision-limit">You will have <strong>5 seconds</strong> to choose a direction at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.</li>
+        <li id="instr-decision-limit">You will have <strong>5 seconds</strong> to choose a direction at each intersection. If you do not choose within 5 seconds, a “Time’s up” message appears and the study moves on to the next intersection.</li>
         <li>Please stay focused.</li>
         <li>This is a serious data collection effort. Do not close this window or switch to another window during the experiment.</li>
       </ol>
@@ -117,7 +117,7 @@
               <div class="decision-timer-track"><div class="decision-timer-fill" id="decision-timer-fill"></div></div>
               <span class="decision-timer-num" id="decision-timer-num" aria-hidden="true">5</span>
             </div>
-            <div id="too-slow" class="too-slow" hidden aria-live="assertive" aria-hidden="true"><span>Too slow</span></div>
+            <div id="times-up" class="times-up" hidden aria-live="polite" aria-hidden="true"><span>Time’s up</span></div>
             <div id="intersection-label" class="intersection-label" hidden></div>
             <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
               <span id="placeholder-text" class="placeholder-text">Recall probe</span>

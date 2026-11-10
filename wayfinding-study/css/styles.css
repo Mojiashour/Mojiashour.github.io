@@ -1607,7 +1607,7 @@ body.admin:has(#screen-trial.active) #btn-withdraw.withdraw-link { top: 52px; }
   text-align: center;
   line-height: 1.35;
 }
-.too-slow {
+.times-up {
   position: absolute;
   inset: 0;
   z-index: 25;
@@ -1615,14 +1615,18 @@ body.admin:has(#screen-trial.active) #btn-withdraw.withdraw-link { top: 52px; }
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(11, 11, 11, 0.28);
+  background: transparent;
 }
-.too-slow[hidden] { display: none !important; }
-.too-slow span {
+.times-up[hidden] { display: none !important; }
+.times-up span {
   font-family: var(--serif);
-  font-size: clamp(2rem, 4.2vw, 3.25rem);
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
   font-weight: 400;
-  color: #ffffff;
+  color: #0b0b0b;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border, #e6e6e6);
+  border-radius: 999px;
+  padding: 0.45rem 1.35rem;
+  box-shadow: 0 1px 8px rgba(11, 11, 11, 0.08);
 }

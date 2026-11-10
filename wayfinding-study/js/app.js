@@ -32,7 +32,7 @@
  *   ?decisionLimit=5000       per-intersection decision time limit in ms (default 5000; 0 = off). Starts when the
  *                             decision clock starts (scene fully visible + DECISION_DELAY_MS), never during a transition.
  *   ?decisionLimitPractice=0  do not apply the decision limit during practice (default: applied, so people learn it)
- *   ?decisionTimeoutFeedbackMs=700  duration of the “Too slow” message after a timeout (default 700)
+ *   ?decisionTimeoutFeedbackMs=700  duration of the “Time’s up” message after a timeout (default 700)
  *   ?trans=2200               total exit+entry corridor transition in ms (default 2200 walking pace; 0 disables)
  *   ?fov=102                  horizontal field of view in degrees (default 102; was 90 in v4.3)
  *   ?prep=1                   use the legacy anticipatory-prep screen instead of the DST
@@ -417,7 +417,7 @@
     pendingSegments = [];
     currentEvent = null;
     clearDecisionLimit();
-    hideTooSlow();
+    hideTimesUp();
     const r = segmentDone; segmentDone = null;
     if (r) r();
     adminSignal("withdraw");
@@ -461,7 +461,7 @@
     pendingSegments = [];
     currentEvent = null;
     clearDecisionLimit();
-    hideTooSlow();
+    hideTimesUp();
     const r = segmentDone; segmentDone = null;
     if (r) r();
     adminSignal("jump");
@@ -472,7 +472,7 @@
     choiceEnabled = false;
     currentEvent = null;
     clearDecisionLimit();
-    hideTooSlow();
+    hideTimesUp();
     clearTransitionVisuals();
     const r = segmentDone; segmentDone = null;
     if (r) r();
@@ -835,7 +835,7 @@
     responding = false;
     decisionOnsetPerf = null;
     clearDecisionLimit();
-    hideTooSlow();
+    hideTimesUp();
     ["btn-left", "btn-right", "btn-probe-left", "btn-probe-right"].forEach((id) => ($(id).disabled = true));
     setDecisionUI(false);
     setProbeUI(false);
@@ -887,20 +887,20 @@
     if (!el) return;
     if (liveDecisionLimitMs > 0) {
       el.hidden = false;
-      el.innerHTML = "You will have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose a direction at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.";
+      el.innerHTML = "You will have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose a direction at each intersection. If you do not choose within " + escapeHtml(decisionLimitLabel()) + ", a “Time’s up” message appears and the study moves on to the next intersection.";
     } else {
       el.hidden = true;
       el.innerHTML = "";
     }
   }
-  function hideTooSlow() {
-    const el = $("too-slow");
+  function hideTimesUp() {
+    const el = $("times-up");
     if (!el) return;
     el.hidden = true;
     el.setAttribute("aria-hidden", "true");
   }
-  function showTooSlow() {
-    const el = $("too-slow");
+  function showTimesUp() {
+    const el = $("times-up");
     if (!el) return;
     el.hidden = false;
     el.setAttribute("aria-hidden", "false");
@@ -1022,11 +1022,11 @@
 
   function introText(spec) {
     const limitNote = liveDecisionLimitMs > 0
-      ? "<p>You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.</p>"
+      ? "<p>You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection.</p>"
       : "";
     if (spec.practiceIntro === "free") {
       const practiceLimit = (liveDecisionLimitMs > 0 && CONFIG.DECISION_LIMIT_IN_PRACTICE)
-        ? "<p>The same time limit is used in practice so you can get used to it. You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose. If you run out of time, you will see “Too slow,” and the practice will continue.</p>"
+        ? "<p>The same time limit is used in practice so you can get used to it. You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose. If you do not choose in time, a “Time’s up” message appears and the practice moves on to the next intersection.</p>"
         : "";
       return { big: "Practice", html:
         "<p>First, a few practice intersections.</p>" +
@@ -1610,7 +1610,7 @@
     const ev = currentEvent;
     const hiddenMs = decisionLimitHiddenMs;
     clearDecisionLimit();
-    hideTooSlow();
+    hideTimesUp();
     const responsePerf = performance.now();
     const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
     pushMarker("response", { choice, rt_ms, trialType: "decision", timedOut: 0 });
@@ -1657,10 +1657,10 @@
     console.log("[trial-timeout]", row);
     // Do not store a choice for recall probes; a later probe that refers to this
     // trial is scored with a blank accuracy and referencedTimedOut = 1.
-    showTooSlow();
+    showTimesUp();
     const wait = CONFIG.DECISION_TIMEOUT_FEEDBACK_MS || 0;
     const afterFeedback = () => {
-      hideTooSlow();
+      hideTimesUp();
       if (currentEvent !== ev) return;
       continueAfterDecision(ev, walkDir);
     };
@@ -2003,7 +2003,7 @@
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
-      <p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, you will see “Too slow,” and the task will continue." : ""} Please try to make your decision as soon as you can, while still trying to be accurate.${nearby}</p>
+      <p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection." : ""} Please try to make your decision as soon as you can, while still trying to be accurate.${nearby}</p>
       <p class="privacy-note"><strong>Nothing that identifies you is collected. You are known in the data only by a study code.</strong></p>
       ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}) — confirm before use.</p>` : ""}`,
       [{ id: "go", label: "Continue" }]);

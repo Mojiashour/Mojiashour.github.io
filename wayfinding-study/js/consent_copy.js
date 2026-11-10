@@ -30,7 +30,7 @@
           <li>Answer questions about how you feel today and how you feel in general, including brief questionnaires about stress, anxiety, sense of direction, spatial anxiety, handedness, and how demanding the task felt.</li>
           <li>Complete a short practice of the wayfinding task so you can get used to the controls.</li>
           <li>Complete two short, timed mental arithmetic checks, one before each wayfinding part.</li>
-          <li>Complete two wayfinding parts. In each part you will view a series of hospital corridor intersections on the screen, look around with the mouse, and choose left or right with the keyboard to reach a destination. At each intersection you will have a short time (5 seconds) to choose a direction. If you do not choose in time, that intersection is recorded as too slow and the task continues. Some intersections include a short memory question about a recent turn.</li>
+          <li>Complete two wayfinding parts. In each part you will view a series of hospital corridor intersections on the screen, look around with the mouse, and choose left or right with the keyboard to reach a destination. At each intersection you will have a short time (5 seconds) to choose a direction. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection. Some intersections include a short memory question about a recent turn.</li>
           <li>After each destination and after each wayfinding part, rate how you feel and how demanding the task was.</li>
           <li>Answer questions about yourself at the end, including your age and other background questions. Age is required. For the other background questions you may choose “I prefer not to answer.”</li>
         </ul>
