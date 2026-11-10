@@ -1,9 +1,10 @@
 /**
+ * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
  * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
  * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
  * Wayfinding SPA v4.5 — visual restyle to match moji-ashour.com; task logic unchanged from v4.4.
  * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
- * a MIST-style stress induction (Dedovic et al., 2005; original HTML/JS, not Inquisit) before each
+ * a stress induction before each
  * wayfinding condition, Nature + Poster(Abstract) conditions on the FINAL 6000x3000 renders, a short
  * corridor-transition animation after each left/right choice, per-block stress sliders, a debrief
  * (comparison bar was not real) then a single end-of-session performance summary (Part 1 / Part 2,
@@ -18,15 +19,19 @@
  *   ?order=NA | AN            condition order (default: derived from a hash bit of the random participant ID)
  *   ?res=6k | 4k              panorama derivative (default 6k = 6000x3000 JPEG; 4k = 4096x2048)
  *   ?trialsPerBlock=4         pilot / debugging (default 14)
- *   ?mistSec=90               duration of each MIST experimental segment in seconds (default 90)
- *   ?mistPracticeSec=40       untimed MIST practice at first use only (default 40; 0 skips practice)
- *   ?mistAvg=85               fixed "average performance" marker, 80–90 (default 85)
- *   ?mistMsg=1                brief negative-evaluative messages between MIST sub-segments (default off)
+ *   ?dstSec=90                duration of each DST math block in seconds (default 90; ?mistSec is an alias)
+ *   ?dstLimitMs=3000          fixed per-problem time limit in ms (default 3000; Norden DST starting value)
+ *   ?dstAvg=75                fixed comparison-average marker (default 75, as in Norden et al.)
+ *   ?legacyMist=1             use the previous adaptive MIST-style block instead of the DST
+ *   ?mistSec=90               alias for ?dstSec=; also used if ?legacyMist=1
+ *   ?mistPracticeSec=40       untimed MIST practice when ?legacyMist=1 (default 40; 0 skips practice)
+ *   ?mistAvg=85               MIST average marker when ?legacyMist=1 (clamped 80–90)
+ *   ?mistMsg=1                brief negative-evaluative messages in the legacy MIST block (default off)
  *   ?trans=2200               total exit+entry corridor transition in ms (default 2200 walking pace; 0 disables)
  *   ?fov=102                  horizontal field of view in degrees (default 102; was 90 in v4.3)
- *   ?prep=1                   use the legacy anticipatory-prep screen instead of MIST
+ *   ?prep=1                   use the legacy anticipatory-prep screen instead of the DST
  *   ?prepSec=45               duration of that legacy prep screen (default 45; the old 120 s default is gone)
- *   ?liveStress=1             use the legacy live serial-subtraction module (failure feedback) instead of MIST
+ *   ?liveStress=1             use the legacy live serial-subtraction module (failure feedback) instead of the DST
  *   ?endMath=1                optional short arithmetic task at the end (default off)
  *   ?mathSec=120              duration of the end arithmetic task when endMath=1 (default 120)
  *   ?stressSec=300            duration of the legacy live stress task when liveStress=1 (default 300)
@@ -58,7 +63,8 @@
   function stressModeFromParams() {
     if (params.get("liveStress") === "1") return "live";
     if (params.get("prep") === "1") return "anticipatory";
-    return "mist";
+    if (params.get("legacyMist") === "1") return "mist";
+    return "dst";
   }
 
   const CONFIG = {
@@ -90,9 +96,15 @@
     MRT: "pending", // UNDECIDED (Peters MRT-A needs answer key + permission): no MRT items are included
     SHOW_SAM: params.get("sam") === "1", // SAM kept in instruments.js but omitted from the flow unless ?sam=1
     SHOW_SUMMARY: params.get("summary") !== "0", // shown once at the end, never after each condition
-    STRESS_MODE: stressModeFromParams(), // default mist; ?prep=1 or ?liveStress=1 select the legacy modules
+    STRESS_MODE: stressModeFromParams(), // default dst; ?legacyMist=1, ?prep=1 or ?liveStress=1 select legacy modules
     PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
-    MIST_S: num("mistSec", 90), // v4.4 default 90 s
+    DST_S: num("dstSec", num("mistSec", 90)),
+    DST_LIMIT_MS: num("dstLimitMs", 3000),
+    DST_AVG: Math.max(0, Math.min(100, num("dstAvg", 75))),
+    DST_ANTICIPATION_MIN_S: num("dstAnticipationMinSec", 20),
+    DST_ANTICIPATION_MAX_S: num("dstAnticipationMaxSec", 30),
+    DST_COUNTDOWN_S: num("dstCountdownSec", 3),
+    MIST_S: num("mistSec", num("dstSec", 90)), // legacy MIST only
     MIST_PRACTICE_S: num("mistPracticeSec", 40),
     MIST_AVG: Math.max(80, Math.min(90, num("mistAvg", 85))),
     MIST_EVAL_MESSAGES: params.get("mistMsg") === "1",
@@ -106,14 +118,14 @@
     TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
     TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
     TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
-    // v4.6 participant default. One constant; ?transStyle= or the admin dropdown can change it.
-    DEFAULT_TRANS_STYLE: "A",
+    // v4.7 participant default is walk (W); ?transStyle= or the admin dropdown can change it.
+    DEFAULT_TRANS_STYLE: "W",
     // WI = walk + dark iris. Exit walk ~1 s; entry iris-open ~450 ms. Total ~1.45 s.
     WI_OUT_MS: 1000,
     WI_IN_MS: 450,
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
-    WORDING_VERSION: "DRAFT_IRB_2026-11-09_v44",
+    WORDING_VERSION: "DRAFT_IRB_2026-11-09_v47",
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
       LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
   };
@@ -195,7 +207,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.6.1",
+    appVersion: "v4.7",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -218,7 +230,7 @@
     trials: [],
     responses: [],   // questionnaire items, long format
     scores: [],      // one row per questionnaire administration
-    stress: { mode: CONFIG.STRESS_MODE, preps: [], live: null, endMath: null, mist: { practice: null, segments: [], state: {} }, debriefShown: false },
+    stress: { mode: CONFIG.STRESS_MODE, preps: [], live: null, endMath: null, mist: { practice: null, segments: [], state: {} }, dst: { anticipation: [], segments: [] }, debriefShown: false },
     summaries: [],
     interview: null,
     events: [],      // every phase / instruction / trial marker, always logged (lab mode also sends to the hook)
@@ -296,7 +308,7 @@
   };
   function parseTransStyle(v) {
     const s = String(v == null ? "" : v).trim();
-    return TRANS_STYLE_ALIASES[s] || TRANS_STYLE_ALIASES[s.toUpperCase()] || CONFIG.DEFAULT_TRANS_STYLE || "A";
+    return TRANS_STYLE_ALIASES[s] || TRANS_STYLE_ALIASES[s.toUpperCase()] || CONFIG.DEFAULT_TRANS_STYLE || "W";
   }
   let liveTransStyle = parseTransStyle(params.get("transStyle") || CONFIG.DEFAULT_TRANS_STYLE);
   let entryTransStyle = null; // snapshot taken at exit, used for the matching entry
@@ -1588,6 +1600,7 @@
       <ul class="intro-list">
         <li>A short set of questions about how you feel today.</li>
         <li>A few practice intersections so you can get used to the controls.</li>
+        <li>Two short, timed arithmetic checks, one before each wayfinding part.</li>
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
@@ -1767,9 +1780,55 @@
     autosave(phaseName);
   }
 
-  /** Default: MIST. Legacy anticipatory prep (?prep=1) or live subtraction (?liveStress=1). */
+  function dstCfg(extra) {
+    return Object.assign({
+      DURATION_S: CONFIG.DST_S,
+      LIMIT_MS: CONFIG.DST_LIMIT_MS,
+      AVERAGE_PCT: CONFIG.DST_AVG,
+      ANTICIPATION_MIN_S: CONFIG.DST_ANTICIPATION_MIN_S,
+      ANTICIPATION_MAX_S: CONFIG.DST_ANTICIPATION_MAX_S,
+      COUNTDOWN_S: CONFIG.DST_COUNTDOWN_S,
+      wordingVersion: CONFIG.WORDING_VERSION,
+    }, extra || {});
+  }
+
+  async function stepDst(variant) {
+    const first = variant === "first";
+    const listId = first ? "A" : "B";
+    const antPhase = first ? "dst_anticipation_1" : "dst_anticipation_2";
+    const cdPhase = first ? "dst_countdown_1" : "dst_countdown_2";
+    const mathPhase = first ? "dst_1" : "dst_2";
+    const sumPhase = first ? "dst_summary_1" : "dst_summary_2";
+    if (!session.stress.dst) session.stress.dst = { anticipation: [], segments: [] };
+    showScreen("page");
+    setPhase(antPhase, { variant: variant });
+    const ant = await window.WFStress.runDstAnticipation(pageHost(), dstCfg({ variant: variant }), (t, x) => logEvent(t, x));
+    session.stress.dst.anticipation.push(ant);
+    autosave(antPhase);
+    throwIfJump();
+    if (!(ant && ant.reason === "skipped")) {
+      setPhase(cdPhase, { variant: variant });
+      await window.WFStress.runDstCountdown(pageHost(), dstCfg({ variant: variant }), (t, x) => logEvent(t, x));
+      throwIfJump();
+    }
+    setPhase(mathPhase, { variant: variant, duration_s: CONFIG.DST_S, average_pct: CONFIG.DST_AVG, list_id: listId, limit_ms: CONFIG.DST_LIMIT_MS });
+    const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId }), (t, x) => logEvent(t, x));
+    session.stress.dst.segments.push(seg);
+    autosave(mathPhase);
+    throwIfJump();
+    if (seg && !seg.skipped) {
+      setPhase(sumPhase, { variant: variant, summary: seg.summary });
+      const html = window.WFStress.dstSummaryHtml(seg.summary);
+      await page(html, [{ id: "go", label: "Continue" }], { cls: "dst-summary-page" });
+      logEvent("dst_summary_shown", { variant: variant, list_id: listId, summary: seg.summary });
+    }
+  }
+
+  /** Default: DST. Legacy MIST (?legacyMist=1), anticipatory prep (?prep=1) or live subtraction (?liveStress=1). */
   async function stepInduction(variant) {
-    if (CONFIG.STRESS_MODE === "mist") {
+    if (CONFIG.STRESS_MODE === "dst") {
+      await stepDst(variant);
+    } else if (CONFIG.STRESS_MODE === "mist") {
       await stepMist(variant);
     } else if (CONFIG.STRESS_MODE === "live") {
       // The live module is used at the first induction point; the second point stays anticipatory.
@@ -2130,7 +2189,7 @@
       <div><strong>Recall probes:</strong> ${probes.length} · accuracy ${nProbeAcc}/${probes.length}</div>
       <div><strong>Questionnaire items:</strong> ${session.responses.length} · administrations ${session.scores.length}</div>
       <div><strong>Summaries:</strong> ${session.summaries.length} rows · completedAt <code>${escapeHtml(session.completedAt || "")}</code></div>
-      <div><strong>Stress:</strong> mode <code>${CONFIG.STRESS_MODE}</code> · MIST items ${((session.stress.mist && session.stress.mist.practice && session.stress.mist.practice.responses) || []).length + (session.stress.mist && session.stress.mist.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · preps ${session.stress.preps.length} · live answers ${(session.stress.live && session.stress.live.responses || []).length} · end-math answers ${(session.stress.endMath && session.stress.endMath.responses || []).length} · events ${session.events.length}</div>`;
+      <div><strong>Stress:</strong> mode <code>${CONFIG.STRESS_MODE}</code> · DST items ${(session.stress.dst && session.stress.dst.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · MIST items ${((session.stress.mist && session.stress.mist.practice && session.stress.mist.practice.responses) || []).length + (session.stress.mist && session.stress.mist.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · preps ${session.stress.preps.length} · live answers ${(session.stress.live && session.stress.live.responses || []).length} · end-math answers ${(session.stress.endMath && session.stress.endMath.responses || []).length} · events ${session.events.length}</div>`;
       if ($("log-preview")) $("log-preview").value = JSON.stringify(session, null, 2);
     }
     showScreen("end");
@@ -2193,8 +2252,9 @@
     "conditionPosition", "block", "blockOrder", "destination", "instrument", "submit_time", "duration_ms", "eligible", "exclusion_items", "vas_stress",
     "sam_valence", "sam_arousal", "somatic", "cognitive", "total", "raw_tlx", "performance_reversed", "sbsod_mean",
     "sas_mean", "n_answered", "lq", "handedness", "presentedOrder"];
-  const STRESS_HEADERS = ["participantId", "task", "phase", "variant", "idx", "difficulty", "level", "problem",
-    "previous", "expected", "given", "correct", "timeout", "feedback", "rt_ms", "limit_ms", "next_limit_ms", "next_level",
+  const STRESS_HEADERS = ["participantId", "task", "phase", "variant", "list_id", "idx", "item_index", "difficulty", "level", "problem",
+    "operand_a", "operand_b", "operator", "source", "previous", "expected", "given", "correct", "timeout", "feedback",
+    "rt_ms", "limit_ms", "next_limit_ms", "next_level", "cutoff_reason",
     "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
   const SUMMARY_HEADERS = ["participantId", "scope", "condition", "conditionName", "conditionPosition", "block", "blockOrder", "destination",
     "n_decisions", "n_correct", "pct_correct", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
@@ -2209,6 +2269,8 @@
     const mist = session.stress && session.stress.mist;
     if (mist && mist.practice) add(mist.practice, "mist");
     (mist && mist.segments || []).forEach((seg) => add(seg, "mist"));
+    const dst = session.stress && session.stress.dst;
+    (dst && dst.segments || []).forEach((seg) => add(seg, "dst"));
     return rows;
   }
   function summaryRows() {
@@ -2236,7 +2298,7 @@
   }
   function exportFiles() {
     const pid = session.participantId || "unknown";
-    const pre = `wayfinding_v44_${pid}_`;
+    const pre = `wayfinding_v47_${pid}_`;
     return {
       [pre + "session.json"]: JSON.stringify(session, null, 2),
       [pre + "trials.csv"]: sessionToCsv(session),
@@ -2280,7 +2342,7 @@
       }
     }
     initAdminBar();
-    $("header-meta").textContent = "v4.6.1 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v4.7 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
@@ -2331,9 +2393,9 @@
         uid, randomToken, randomIdPart, orderBit, idHashBit, parseTransStyle, currentTransStyle, setLiveTransStyle,
         get adminMode() { return adminMode; }, requestJump, requestSkip };
     }
-    console.log("[wayfinding v4.6.1] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.7] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
-      showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
+      showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode });
     runSession().catch((err) => { console.error("[session]", err); logEvent("session_error", { message: String(err && err.message) }); });
   }

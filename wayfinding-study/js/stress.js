@@ -1,16 +1,16 @@
 /**
- * v4.3 stress-induction modules.
+ * v4.7 stress-induction modules.
  *
- * Default: a MIST-style experimental block built from the published method
- * (Dedovic et al., 2005, J Psychiatry Neurosci 30(5): 319–325). This is an
- * original HTML/JS implementation from the paper's description. It does not
- * copy Inquisit / Millisecond code or assets.
+ * Default: a DST-style timed math block adapted from Norden et al. (2022),
+ * J Med Internet Res 24(7):e32280, with a fixed problem list and a fixed
+ * per-item limit for every participant (see DST_LISTS / DST_DEFAULTS).
  *
- *   WFStress.runMist(host, cfg, onEvent)
- *     cfg.phase = "practice" (untimed, first use) or "experimental" (timed,
- *     with a performance bar and a fixed high "average" marker).
+ *   WFStress.runDstAnticipation(host, cfg, onEvent)
+ *   WFStress.runDstCountdown(host, cfg, onEvent)
+ *   WFStress.runDst(host, cfg, onEvent)
  *
  * Legacy modules, off unless flagged in the app:
+ *   WFStress.runMist  — previous adaptive MIST-style block (?legacyMist=1)
  *   WFStress.runPrep  — anticipatory preparation screen (?prep=1)
  *   WFStress.run      — live serial subtraction with failure feedback (?liveStress=1)
  *   WFStress.runQuiet — optional short real arithmetic at the end (?endMath=1)
@@ -25,7 +25,7 @@
     return false;
   }
 
-  const WORDING_VERSION = "DRAFT_IRB_2026-11-09_v43";
+  const WORDING_VERSION = "DRAFT_IRB_2026-11-09_v47";
 
   const PREP_COPY = {
     first: {
@@ -102,9 +102,9 @@
     title: "Debriefing",
     html: `
       <p class="draft-banner"><strong>DRAFT for IRB review — not final consent/debrief language.</strong></p>
-      <p>During the mental arithmetic task, a bar compared “your performance” with “average performance.”</p>
-      <p>The “average performance” marker was <strong>not</strong> a real average of other participants. It was a fixed, high value (around 80–90%). The time allowed for each problem was also adjusted so that the task would stay very difficult for everyone. The comparison was part of the study procedure, not a true score of your ability.</p>
-      <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to everyday evaluative stress. If you have questions or would like to talk about how you felt during the task, please contact the study team.</p>
+      <p>During the timed arithmetic task, a bar compared your accuracy with an “average” of other participants.</p>
+      <p>That average was <strong>not</strong> a real average of other participants. It was a fixed reference value (75%) used to create mild evaluative pressure. The problems were designed to be difficult in the time allowed. Performance on this task is not a measure of your ability.</p>
+      <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. If you have questions or would like to talk about how you felt during the task, please contact the study team.</p>
       <p><strong>[PLACEHOLDER: additional IRB-approved debrief text, including who to contact and any further clarification the IRB requires.]</strong></p>`,
   };
 
@@ -867,10 +867,663 @@
     });
   }
 
+  /* ========================================================================
+   * DST-style math stress block (v4.7)
+   *
+   * Adapted from the published Digital Stress Test Math-Task
+   * (Norden et al., 2022, J Med Internet Res 24(7):e32280) and the
+   * study memo in /workspace/stress_review/stress_papers_review.md.
+   *
+   * From the paper (used as specified):
+   *   - 90 s block; duration is not shown to the participant
+   *   - two-number + − × ÷ problems, operands 1–99, answers 1–99
+   *   - 3 s per-item limit (the paper's starting value for the DST, here
+   *     held fixed for everyone: no ±10% adaptation, no keypad shuffle)
+   *   - fake comparison average of 75%
+   *   - feedback "Wrong answer!" / "Too slow!"; red cue; next item
+   *     immediately after a correct answer
+   *   - 3 s countdown before the block
+   *   - no practice problems and no practice-based timing (Norden did not
+   *     use a practice baseline; timing started at a fixed 3 s)
+   *
+   * Our choices (not a published item list):
+   *   - two fixed lists (A, B), identical for every participant, written
+   *     to match the paper's constraints. List A item 1 is 38 + 21, the
+   *     only DST arithmetic example visible in Figure 1 of the paper.
+   *     Every other item is ours (source: "study_list").
+   *   - 20–30 s anticipatory screen, then "I'm ready", then the countdown
+   *   - no camera, no speech, no random keypad, no "only serious results"
+   *     line (the last per the study memo, for a student sample)
+   * ======================================================================== */
+
+  const DST_DEFAULTS = {
+    DURATION_S: 90,
+    LIMIT_MS: 3000,          // Norden et al.: first-item limit in the DST
+    AVERAGE_PCT: 75,         // Norden et al.: fabricated comparison average
+    COUNTDOWN_S: 3,          // Norden et al. / openDST CountdownBeforeTask
+    ANTICIPATION_MIN_S: 20,  // grant/memo: 20–30 s anticipatory screen
+    ANTICIPATION_MAX_S: 30,
+    FEEDBACK_WRONG_MS: 1000, // openDST: 1000 ms on wrong / too slow
+    FEEDBACK_CORRECT_MS: 50, // openDST: 50 ms, then next item
+    MISSING_STREAK: 5,       // paper: reminder after 5 consecutive non-responses
+    // Paper then swaps in an easy summation. We keep the fixed list and
+    // only show the reminder, so every participant still sees the same items.
+  };
+
+  const DST_COPY = {
+    first: {
+      title: "Short performance check",
+      html: `<p>You will now complete a short, timed arithmetic test. It is used as a brief check of performance under time pressure, of the kind people often feel before a test or presentation.</p>
+        <p>You will have only a few seconds for each problem. Your accuracy will be compared with the average of other participants in this study.</p>
+        <p>Enter each answer with the number keys or the keypad. Please sit still, get ready, and start when you are prepared.</p>`,
+    },
+    second: {
+      title: "Short performance check",
+      html: `<p>You will now complete a second short, timed arithmetic test. As before, this is a brief check of performance under time pressure, and your accuracy will also be compared with the average of other participants in this study.</p>
+        <p>You will have only a few seconds for each problem. Enter each answer with the number keys or the keypad.</p>
+        <p>Please sit still, get ready, and start when you are prepared.</p>`,
+    },
+    ready: "I’m ready",
+    wait: "The start button will be available in {n} seconds.",
+    countdownLabel: "Get ready",
+    taskTitle: "Timed arithmetic",
+    hint: "Enter your answer with the number keys or the keypad.",
+    yourPerf: "You",
+    avgPerf: "Average",
+    wrong: "Wrong answer!",
+    slow: "Too slow!",
+    missing: "Please try to answer the question. Your participation is important for this study.",
+  };
+
+
+  const DST_LISTS = {
+    A: [
+      { a: 38, b: 21, expr: "38 + 21", answer: 59, op: "+", d: 2, source: "norden_fig1" },
+      { a: 2, b: 20, expr: "2 × 20", answer: 40, op: "×", d: 0, source: "study_list" },
+      { a: 35, b: 5, expr: "35 − 5", answer: 30, op: "−", d: 0, source: "study_list" },
+      { a: 45, b: 5, expr: "45 ÷ 5", answer: 9, op: "÷", d: 1, source: "study_list" },
+      { a: 17, b: 57, expr: "17 + 57", answer: 74, op: "+", d: 3, source: "study_list" },
+      { a: 2, b: 45, expr: "2 × 45", answer: 90, op: "×", d: 0, source: "study_list" },
+      { a: 39, b: 9, expr: "39 − 9", answer: 30, op: "−", d: 0, source: "study_list" },
+      { a: 66, b: 2, expr: "66 ÷ 2", answer: 33, op: "÷", d: 0, source: "study_list" },
+      { a: 26, b: 40, expr: "26 + 40", answer: 66, op: "+", d: 2, source: "study_list" },
+      { a: 16, b: 2, expr: "16 × 2", answer: 32, op: "×", d: 0, source: "study_list" },
+      { a: 26, b: 9, expr: "26 − 9", answer: 17, op: "−", d: 1, source: "study_list" },
+      { a: 84, b: 6, expr: "84 ÷ 6", answer: 14, op: "÷", d: 3, source: "study_list" },
+      { a: 7, b: 78, expr: "7 + 78", answer: 85, op: "+", d: 1, source: "study_list" },
+      { a: 3, b: 9, expr: "3 × 9", answer: 27, op: "×", d: 1, source: "study_list" },
+      { a: 58, b: 15, expr: "58 − 15", answer: 43, op: "−", d: 2, source: "study_list" },
+      { a: 40, b: 5, expr: "40 ÷ 5", answer: 8, op: "÷", d: 1, source: "study_list" },
+      { a: 38, b: 56, expr: "38 + 56", answer: 94, op: "+", d: 3, source: "study_list" },
+      { a: 5, b: 4, expr: "5 × 4", answer: 20, op: "×", d: 1, source: "study_list" },
+      { a: 61, b: 55, expr: "61 − 55", answer: 6, op: "−", d: 3, source: "study_list" },
+      { a: 66, b: 6, expr: "66 ÷ 6", answer: 11, op: "÷", d: 3, source: "study_list" },
+      { a: 15, b: 30, expr: "15 + 30", answer: 45, op: "+", d: 2, source: "study_list" },
+      { a: 9, b: 5, expr: "9 × 5", answer: 45, op: "×", d: 1, source: "study_list" },
+      { a: 90, b: 51, expr: "90 − 51", answer: 39, op: "−", d: 3, source: "study_list" },
+      { a: 90, b: 10, expr: "90 ÷ 10", answer: 9, op: "÷", d: 0, source: "study_list" },
+      { a: 34, b: 4, expr: "34 + 4", answer: 38, op: "+", d: 0, source: "study_list" },
+      { a: 4, b: 19, expr: "4 × 19", answer: 76, op: "×", d: 2, source: "study_list" },
+      { a: 52, b: 6, expr: "52 − 6", answer: 46, op: "−", d: 1, source: "study_list" },
+      { a: 20, b: 5, expr: "20 ÷ 5", answer: 4, op: "÷", d: 1, source: "study_list" },
+      { a: 70, b: 9, expr: "70 + 9", answer: 79, op: "+", d: 0, source: "study_list" },
+      { a: 3, b: 28, expr: "3 × 28", answer: 84, op: "×", d: 2, source: "study_list" },
+      { a: 61, b: 35, expr: "61 − 35", answer: 26, op: "−", d: 3, source: "study_list" },
+      { a: 70, b: 5, expr: "70 ÷ 5", answer: 14, op: "÷", d: 2, source: "study_list" },
+      { a: 34, b: 26, expr: "34 + 26", answer: 60, op: "+", d: 3, source: "study_list" },
+      { a: 7, b: 11, expr: "7 × 11", answer: 77, op: "×", d: 3, source: "study_list" },
+      { a: 73, b: 39, expr: "73 − 39", answer: 34, op: "−", d: 3, source: "study_list" },
+      { a: 98, b: 7, expr: "98 ÷ 7", answer: 14, op: "÷", d: 3, source: "study_list" },
+      { a: 43, b: 19, expr: "43 + 19", answer: 62, op: "+", d: 3, source: "study_list" },
+      { a: 6, b: 13, expr: "6 × 13", answer: 78, op: "×", d: 3, source: "study_list" },
+      { a: 79, b: 8, expr: "79 − 8", answer: 71, op: "−", d: 0, source: "study_list" },
+      { a: 75, b: 15, expr: "75 ÷ 15", answer: 5, op: "÷", d: 2, source: "study_list" },
+      { a: 5, b: 82, expr: "5 + 82", answer: 87, op: "+", d: 0, source: "study_list" },
+      { a: 9, b: 11, expr: "9 × 11", answer: 99, op: "×", d: 3, source: "study_list" },
+      { a: 41, b: 30, expr: "41 − 30", answer: 11, op: "−", d: 2, source: "study_list" },
+      { a: 65, b: 5, expr: "65 ÷ 5", answer: 13, op: "÷", d: 2, source: "study_list" },
+      { a: 33, b: 45, expr: "33 + 45", answer: 78, op: "+", d: 2, source: "study_list" },
+      { a: 29, b: 3, expr: "29 × 3", answer: 87, op: "×", d: 2, source: "study_list" },
+      { a: 84, b: 45, expr: "84 − 45", answer: 39, op: "−", d: 3, source: "study_list" },
+      { a: 24, b: 4, expr: "24 ÷ 4", answer: 6, op: "÷", d: 1, source: "study_list" },
+      { a: 35, b: 6, expr: "35 + 6", answer: 41, op: "+", d: 1, source: "study_list" },
+      { a: 6, b: 11, expr: "6 × 11", answer: 66, op: "×", d: 3, source: "study_list" },
+      { a: 64, b: 60, expr: "64 − 60", answer: 4, op: "−", d: 2, source: "study_list" },
+      { a: 78, b: 6, expr: "78 ÷ 6", answer: 13, op: "÷", d: 3, source: "study_list" },
+      { a: 69, b: 11, expr: "69 + 11", answer: 80, op: "+", d: 3, source: "study_list" },
+      { a: 4, b: 16, expr: "4 × 16", answer: 64, op: "×", d: 2, source: "study_list" },
+      { a: 93, b: 8, expr: "93 − 8", answer: 85, op: "−", d: 1, source: "study_list" },
+      { a: 28, b: 7, expr: "28 ÷ 7", answer: 4, op: "÷", d: 2, source: "study_list" },
+      { a: 47, b: 4, expr: "47 + 4", answer: 51, op: "+", d: 1, source: "study_list" },
+      { a: 7, b: 4, expr: "7 × 4", answer: 28, op: "×", d: 1, source: "study_list" },
+      { a: 83, b: 60, expr: "83 − 60", answer: 23, op: "−", d: 2, source: "study_list" },
+      { a: 94, b: 2, expr: "94 ÷ 2", answer: 47, op: "÷", d: 0, source: "study_list" },
+    ],
+    B: [
+      { a: 18, b: 31, expr: "18 + 31", answer: 49, op: "+", d: 2, source: "study_list" },
+      { a: 25, b: 2, expr: "25 × 2", answer: 50, op: "×", d: 0, source: "study_list" },
+      { a: 29, b: 5, expr: "29 − 5", answer: 24, op: "−", d: 0, source: "study_list" },
+      { a: 28, b: 4, expr: "28 ÷ 4", answer: 7, op: "÷", d: 1, source: "study_list" },
+      { a: 27, b: 24, expr: "27 + 24", answer: 51, op: "+", d: 3, source: "study_list" },
+      { a: 14, b: 2, expr: "14 × 2", answer: 28, op: "×", d: 0, source: "study_list" },
+      { a: 68, b: 5, expr: "68 − 5", answer: 63, op: "−", d: 0, source: "study_list" },
+      { a: 60, b: 10, expr: "60 ÷ 10", answer: 6, op: "÷", d: 0, source: "study_list" },
+      { a: 19, b: 80, expr: "19 + 80", answer: 99, op: "+", d: 2, source: "study_list" },
+      { a: 19, b: 2, expr: "19 × 2", answer: 38, op: "×", d: 0, source: "study_list" },
+      { a: 73, b: 6, expr: "73 − 6", answer: 67, op: "−", d: 1, source: "study_list" },
+      { a: 77, b: 7, expr: "77 ÷ 7", answer: 11, op: "÷", d: 3, source: "study_list" },
+      { a: 4, b: 26, expr: "4 + 26", answer: 30, op: "+", d: 1, source: "study_list" },
+      { a: 6, b: 5, expr: "6 × 5", answer: 30, op: "×", d: 1, source: "study_list" },
+      { a: 58, b: 41, expr: "58 − 41", answer: 17, op: "−", d: 2, source: "study_list" },
+      { a: 40, b: 4, expr: "40 ÷ 4", answer: 10, op: "÷", d: 1, source: "study_list" },
+      { a: 22, b: 59, expr: "22 + 59", answer: 81, op: "+", d: 3, source: "study_list" },
+      { a: 3, b: 7, expr: "3 × 7", answer: 21, op: "×", d: 1, source: "study_list" },
+      { a: 66, b: 48, expr: "66 − 48", answer: 18, op: "−", d: 3, source: "study_list" },
+      { a: 91, b: 7, expr: "91 ÷ 7", answer: 13, op: "÷", d: 3, source: "study_list" },
+      { a: 23, b: 50, expr: "23 + 50", answer: 73, op: "+", d: 2, source: "study_list" },
+      { a: 3, b: 4, expr: "3 × 4", answer: 12, op: "×", d: 1, source: "study_list" },
+      { a: 93, b: 17, expr: "93 − 17", answer: 76, op: "−", d: 3, source: "study_list" },
+      { a: 72, b: 2, expr: "72 ÷ 2", answer: 36, op: "÷", d: 0, source: "study_list" },
+      { a: 7, b: 51, expr: "7 + 51", answer: 58, op: "+", d: 0, source: "study_list" },
+      { a: 3, b: 19, expr: "3 × 19", answer: 57, op: "×", d: 2, source: "study_list" },
+      { a: 50, b: 7, expr: "50 − 7", answer: 43, op: "−", d: 1, source: "study_list" },
+      { a: 24, b: 3, expr: "24 ÷ 3", answer: 8, op: "÷", d: 1, source: "study_list" },
+      { a: 5, b: 40, expr: "5 + 40", answer: 45, op: "+", d: 0, source: "study_list" },
+      { a: 3, b: 22, expr: "3 × 22", answer: 66, op: "×", d: 2, source: "study_list" },
+      { a: 90, b: 66, expr: "90 − 66", answer: 24, op: "−", d: 3, source: "study_list" },
+      { a: 48, b: 4, expr: "48 ÷ 4", answer: 12, op: "÷", d: 2, source: "study_list" },
+      { a: 46, b: 15, expr: "46 + 15", answer: 61, op: "+", d: 3, source: "study_list" },
+      { a: 8, b: 11, expr: "8 × 11", answer: 88, op: "×", d: 3, source: "study_list" },
+      { a: 38, b: 19, expr: "38 − 19", answer: 19, op: "−", d: 3, source: "study_list" },
+      { a: 88, b: 8, expr: "88 ÷ 8", answer: 11, op: "÷", d: 3, source: "study_list" },
+      { a: 45, b: 48, expr: "45 + 48", answer: 93, op: "+", d: 3, source: "study_list" },
+      { a: 7, b: 14, expr: "7 × 14", answer: 98, op: "×", d: 3, source: "study_list" },
+      { a: 97, b: 6, expr: "97 − 6", answer: 91, op: "−", d: 0, source: "study_list" },
+      { a: 60, b: 30, expr: "60 ÷ 30", answer: 2, op: "÷", d: 2, source: "study_list" },
+      { a: 4, b: 44, expr: "4 + 44", answer: 48, op: "+", d: 0, source: "study_list" },
+      { a: 12, b: 6, expr: "12 × 6", answer: 72, op: "×", d: 3, source: "study_list" },
+      { a: 66, b: 22, expr: "66 − 22", answer: 44, op: "−", d: 2, source: "study_list" },
+      { a: 87, b: 3, expr: "87 ÷ 3", answer: 29, op: "÷", d: 2, source: "study_list" },
+      { a: 62, b: 33, expr: "62 + 33", answer: 95, op: "+", d: 2, source: "study_list" },
+      { a: 3, b: 17, expr: "3 × 17", answer: 51, op: "×", d: 2, source: "study_list" },
+      { a: 62, b: 45, expr: "62 − 45", answer: 17, op: "−", d: 3, source: "study_list" },
+      { a: 20, b: 4, expr: "20 ÷ 4", answer: 5, op: "÷", d: 1, source: "study_list" },
+      { a: 6, b: 34, expr: "6 + 34", answer: 40, op: "+", d: 1, source: "study_list" },
+      { a: 6, b: 15, expr: "6 × 15", answer: 90, op: "×", d: 3, source: "study_list" },
+      { a: 47, b: 21, expr: "47 − 21", answer: 26, op: "−", d: 2, source: "study_list" },
+      { a: 96, b: 8, expr: "96 ÷ 8", answer: 12, op: "÷", d: 3, source: "study_list" },
+      { a: 25, b: 45, expr: "25 + 45", answer: 70, op: "+", d: 3, source: "study_list" },
+      { a: 3, b: 11, expr: "3 × 11", answer: 33, op: "×", d: 2, source: "study_list" },
+      { a: 56, b: 9, expr: "56 − 9", answer: 47, op: "−", d: 1, source: "study_list" },
+      { a: 28, b: 14, expr: "28 ÷ 14", answer: 2, op: "÷", d: 2, source: "study_list" },
+      { a: 19, b: 7, expr: "19 + 7", answer: 26, op: "+", d: 1, source: "study_list" },
+      { a: 5, b: 10, expr: "5 × 10", answer: 50, op: "×", d: 1, source: "study_list" },
+      { a: 96, b: 23, expr: "96 − 23", answer: 73, op: "−", d: 2, source: "study_list" },
+      { a: 70, b: 10, expr: "70 ÷ 10", answer: 7, op: "÷", d: 0, source: "study_list" },
+    ],
+  };
+
+
+  function dstPadHtml() {
+    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+    return `<div class="dst-pad" role="group" aria-label="Number keypad">` +
+      keys.map((d) => `<button type="button" class="dst-pad-btn" data-digit="${d}" aria-label="Digit ${d}">${d}</button>`).join("") +
+      `</div>`;
+  }
+
+  function dstEnsureFlash() {
+    let el = document.getElementById("dst-flash");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "dst-flash";
+      el.setAttribute("aria-hidden", "true");
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function dstFlash(on) {
+    const el = dstEnsureFlash();
+    el.classList.toggle("on", !!on);
+  }
+
+  function dstAnswerSlots(answer, typed) {
+    const n = String(answer).length;
+    const chars = String(typed || "");
+    let html = "";
+    for (let i = 0; i < n; i++) {
+      const ch = i < chars.length ? chars[i] : "";
+      html += `<span class="dst-slot${ch ? " filled" : ""}">${ch || "&nbsp;"}</span>`;
+    }
+    return html;
+  }
+
+  function runDstAnticipation(host, cfg, onEvent) {
+    const C = Object.assign({}, DST_DEFAULTS, cfg || {});
+    const variant = C.variant === "second" ? "second" : "first";
+    const copy = DST_COPY[variant];
+    const minS = C.ANTICIPATION_MIN_S;
+    const maxS = C.ANTICIPATION_MAX_S;
+    return new Promise((resolve) => {
+      host.innerHTML = `<div class="dst dst-anticipation" data-dst-variant="${variant}">
+        <p class="dst-kicker">Performance check</p>
+        <h2 class="dst-title">${copy.title}</h2>
+        <div class="dst-copy">${copy.html}</div>
+        <p class="dst-wait" id="dst-wait"></p>
+        <div class="btn-row">
+          <button type="button" class="dst-ready" id="dst-ready" disabled>${DST_COPY.ready}</button>
+        </div>
+        <p class="exp-note draft-note" hidden>DRAFT wording (${C.wordingVersion || WORDING_VERSION}). Experimenter: Esc skips.</p>
+      </div>`;
+      if (document.body.classList.contains("debug")) {
+        const n = host.querySelector(".draft-note");
+        if (n) n.hidden = false;
+      }
+      const btn = host.querySelector("#dst-ready");
+      const wait = host.querySelector("#dst-wait");
+      const t0 = performance.now();
+      let done = false;
+      let raf = null;
+
+      const finish = (reason) => {
+        if (done) return;
+        done = true;
+        activeSkip = null;
+        cancelAnimationFrame(raf);
+        document.removeEventListener("keydown", onKey, true);
+        dstFlash(false);
+        const duration_ms = Math.round(performance.now() - t0);
+        const result = { variant: variant, reason: reason, duration_ms: duration_ms, min_s: minS, max_s: maxS };
+        onEvent && onEvent("dst_anticipation_end", result);
+        resolve(result);
+      };
+
+      const onKey = (e) => {
+        if (e.key === "Escape") { e.preventDefault(); finish("skipped"); }
+      };
+
+      const tick = (now) => {
+        if (done) return;
+        const elapsed = (now - t0) / 1000;
+        const leftMin = Math.max(0, Math.ceil(minS - elapsed));
+        if (elapsed >= minS) {
+          if (btn.disabled) {
+            btn.disabled = false;
+            if (wait) wait.textContent = "";
+          }
+        } else if (wait) {
+          wait.textContent = DST_COPY.wait.replace("{n}", String(leftMin));
+        }
+        if (elapsed >= maxS) { finish("auto"); return; }
+        raf = requestAnimationFrame(tick);
+      };
+
+      btn.addEventListener("click", () => finish("ready"));
+      document.addEventListener("keydown", onKey, true);
+      activeSkip = () => finish("skipped");
+      onEvent && onEvent("dst_anticipation_start", { variant: variant, min_s: minS, max_s: maxS, wordingVersion: C.wordingVersion || WORDING_VERSION });
+      raf = requestAnimationFrame(tick);
+    });
+  }
+
+  function runDstCountdown(host, cfg, onEvent) {
+    const C = Object.assign({}, DST_DEFAULTS, cfg || {});
+    const total = Math.max(1, C.COUNTDOWN_S | 0);
+    return new Promise((resolve) => {
+      host.innerHTML = `<div class="dst dst-countdown">
+        <p class="dst-kicker">${DST_COPY.countdownLabel}</p>
+        <div class="dst-count-num" id="dst-count-num" aria-live="assertive">${total}</div>
+      </div>`;
+      const el = host.querySelector("#dst-count-num");
+      const t0 = performance.now();
+      let remaining = total;
+      let done = false;
+      let iv = null;
+      const finish = (reason) => {
+        if (done) return;
+        done = true;
+        activeSkip = null;
+        clearInterval(iv);
+        document.removeEventListener("keydown", onKey, true);
+        onEvent && onEvent("dst_countdown_end", { reason: reason, duration_ms: Math.round(performance.now() - t0) });
+        resolve({ reason: reason, duration_ms: Math.round(performance.now() - t0) });
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); finish("skipped"); } };
+      document.addEventListener("keydown", onKey, true);
+      activeSkip = () => finish("skipped");
+      onEvent && onEvent("dst_countdown_start", { seconds: total });
+      iv = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) { finish("completed"); return; }
+        if (el) el.textContent = String(remaining);
+      }, 1000);
+    });
+  }
+
+  function runDst(host, cfg, onEvent) {
+    const C = Object.assign({}, DST_DEFAULTS, cfg || {});
+    const variant = C.variant === "second" ? "second" : "first";
+    const listId = C.listId || (variant === "second" ? "B" : "A");
+    const list = (C.list && C.list.length ? C.list : (DST_LISTS[listId] || DST_LISTS.A)).map(function (it, i) {
+      return Object.assign({ idx: i + 1 }, it);
+    });
+    const limitMs = Math.max(500, C.LIMIT_MS | 0);
+    const durationS = Math.max(1, C.DURATION_S | 0);
+    const avgPct = clamp(C.AVERAGE_PCT, 0, 100);
+
+    return new Promise((resolve) => {
+      host.innerHTML = `<div class="dst dst-task" data-dst-variant="${variant}" data-dst-list="${listId}">
+        <div class="dst-top">
+          <p class="dst-kicker">${DST_COPY.taskTitle}</p>
+          <span id="dst-clock" class="dst-clock" hidden></span>
+        </div>
+        <div class="dst-perf" id="dst-perf">
+          <div class="dst-bar-row">
+            <span class="dst-bar-lab">${DST_COPY.yourPerf}</span>
+            <div class="dst-bar-track" role="img" id="dst-you-track" aria-label="Your accuracy">
+              <div class="dst-bar-fill dst-bar-you" id="dst-you" style="width:0%"></div>
+            </div>
+            <span class="dst-bar-pct" id="dst-you-pct">0%</span>
+          </div>
+          <div class="dst-bar-row">
+            <span class="dst-bar-lab">${DST_COPY.avgPerf}</span>
+            <div class="dst-bar-track" role="img" aria-label="Average ${avgPct} percent">
+              <div class="dst-bar-fill dst-bar-avg" id="dst-avg" style="width:${avgPct}%"></div>
+            </div>
+            <span class="dst-bar-pct">${avgPct}%</span>
+          </div>
+        </div>
+        <div class="dst-problem-wrap">
+          <div class="dst-problem" id="dst-problem" aria-live="polite">&nbsp;</div>
+          <div class="dst-equals">=</div>
+          <div class="dst-answer" id="dst-answer" aria-live="polite"></div>
+        </div>
+        <div class="dst-timer" id="dst-timer" aria-hidden="true">
+          <div class="dst-timer-fill" id="dst-timer-fill"></div>
+        </div>
+        <div class="dst-fb" id="dst-fb">&nbsp;</div>
+        <div class="dst-missing" id="dst-missing" hidden><p>${DST_COPY.missing}</p></div>
+        ${dstPadHtml()}
+        <p class="hint dst-hint">${DST_COPY.hint}</p>
+        <p class="exp-note draft-note" hidden>DRAFT wording (${C.wordingVersion || WORDING_VERSION}). Experimenter: Esc skips this segment.</p>
+      </div>`;
+      if (document.body.classList.contains("debug") || document.body.classList.contains("admin")) {
+        const n = host.querySelector(".draft-note");
+        if (n && document.body.classList.contains("debug")) n.hidden = false;
+        const clock = host.querySelector("#dst-clock");
+        if (clock && document.body.classList.contains("admin")) clock.hidden = false;
+      }
+
+      const elProb = host.querySelector("#dst-problem");
+      const elAns = host.querySelector("#dst-answer");
+      const elFb = host.querySelector("#dst-fb");
+      const elFill = host.querySelector("#dst-timer-fill");
+      const elYou = host.querySelector("#dst-you");
+      const elYouPct = host.querySelector("#dst-you-pct");
+      const elYouTrack = host.querySelector("#dst-you-track");
+      const elClock = host.querySelector("#dst-clock");
+      const elMissing = host.querySelector("#dst-missing");
+      const buttons = Array.from(host.querySelectorAll(".dst-pad-btn"));
+
+      const t0 = performance.now();
+      const responses = [];
+      let nCorrect = 0, nWrong = 0, nTimeout = 0;
+      let itemOnset = 0, timer = null, raf = null, locked = false, done = false;
+      let current = null, currentIndex = 0, typed = "";
+      let noAnswerStreak = 0;
+      let itemTimerStart = 0;
+
+      const yourPct = () => {
+        const n = responses.length;
+        return n ? (100 * nCorrect) / n : 0;
+      };
+      const updateBar = () => {
+        const p = yourPct();
+        if (elYou) elYou.style.width = p.toFixed(1) + "%";
+        if (elYouPct) elYouPct.textContent = Math.round(p) + "%";
+        if (elYouTrack) elYouTrack.setAttribute("aria-label", `Your accuracy ${Math.round(p)} percent, average ${avgPct} percent`);
+      };
+      const setPadEnabled = (on) => { buttons.forEach((b) => { b.disabled = !on; }); };
+      const renderAnswer = () => {
+        if (!current) { elAns.innerHTML = ""; return; }
+        elAns.innerHTML = dstAnswerSlots(current.answer, typed);
+      };
+
+      const finish = (skipped, reason) => {
+        if (done) return;
+        done = true;
+        activeSkip = null;
+        clearTimeout(timer);
+        cancelAnimationFrame(raf);
+        document.removeEventListener("keydown", onKey, true);
+        dstFlash(false);
+        const duration_ms = Math.round(performance.now() - t0);
+        const summary = {
+          phase: "experimental",
+          variant: variant,
+          list_id: listId,
+          skipped: skipped ? 1 : 0,
+          reason: reason || (skipped ? "skipped" : "completed"),
+          n_responses: responses.length,
+          n_correct: nCorrect,
+          n_wrong: nWrong,
+          n_timeout: nTimeout,
+          pct_correct: responses.length ? Math.round(1000 * nCorrect / responses.length) / 10 : 0,
+          average_marker_pct: avgPct,
+          your_pct: responses.length ? Math.round(10 * yourPct()) / 10 : 0,
+          limit_ms: limitMs,
+          duration_s: durationS,
+          duration_ms: duration_ms,
+          wordingVersion: C.wordingVersion || WORDING_VERSION,
+          protocol: "dst_norden_2022",
+        };
+        onEvent && onEvent("dst_offset", { variant: variant, list_id: listId, skipped: skipped ? 1 : 0, summary: summary });
+        resolve({
+          config: { DURATION_S: durationS, LIMIT_MS: limitMs, AVERAGE_PCT: avgPct, listId: listId },
+          phase: "experimental",
+          variant: variant,
+          list_id: listId,
+          skipped: !!skipped,
+          responses: responses,
+          summary: summary,
+        });
+      };
+
+      const respond = (kind, givenStr) => {
+        if (locked || done || !current) return;
+        locked = true;
+        clearTimeout(timer);
+        const now = performance.now();
+        const timeout = kind === "timeout" || kind === "block_end";
+        const given = timeout ? (givenStr || typed || "") : String(givenStr);
+        const correct = !timeout && given !== "" && Number(given) === current.answer;
+        let feedback;
+        if (correct) feedback = "correct";
+        else if (timeout) feedback = DST_COPY.slow;
+        else feedback = DST_COPY.wrong;
+        if (correct) { nCorrect++; noAnswerStreak = 0; }
+        else if (timeout) { nTimeout++; noAnswerStreak++; }
+        else { nWrong++; noAnswerStreak = 0; }
+
+        const row = {
+          idx: responses.length + 1,
+          task: "dst",
+          phase: "experimental",
+          variant: variant,
+          list_id: listId,
+          item_index: current.idx,
+          problem: current.expr,
+          operand_a: current.a,
+          operand_b: current.b,
+          operator: current.op,
+          source: current.source || "study_list",
+          expected: current.answer,
+          given: given,
+          correct: correct ? 1 : 0,
+          timeout: timeout ? 1 : 0,
+          feedback: feedback,
+          rt_ms: Math.round(now - itemOnset),
+          limit_ms: limitMs,
+          cutoff_reason: kind === "block_end" ? "block_end" : (timeout ? "item_limit" : ""),
+          onset_perf: +itemOnset.toFixed(1),
+          response_perf: +now.toFixed(1),
+          elapsed_ms: Math.round(now - t0),
+          timestamp: new Date().toISOString(),
+          average_marker: avgPct,
+          your_pct: "",
+        };
+        responses.push(row);
+        row.your_pct = Math.round(10 * yourPct()) / 10;
+        updateBar();
+        const card = host.querySelector(".dst");
+        if (correct) {
+          elFb.textContent = "";
+          elFb.className = "dst-fb";
+          dstFlash(false);
+          if (card) card.classList.remove("is-bad");
+        } else {
+          elFb.textContent = feedback;
+          elFb.className = "dst-fb bad";
+          dstFlash(true);
+          if (card) card.classList.add("is-bad");
+        }
+        setPadEnabled(false);
+        onEvent && onEvent("dst_response", {
+          variant: variant, list_id: listId, correct: row.correct, timeout: row.timeout,
+          rt_ms: row.rt_ms, feedback: feedback, problem: current.expr, given: given,
+        });
+
+        const wait = correct ? C.FEEDBACK_CORRECT_MS : C.FEEDBACK_WRONG_MS;
+        const afterFb = () => {
+          dstFlash(false);
+          const card = host.querySelector(".dst");
+          if (card) card.classList.remove("is-bad");
+          if (done) return;
+          if (kind === "block_end") { finish(false, "completed"); return; }
+          nextItem();
+        };
+        if (wait <= 0) afterFb();
+        else setTimeout(afterFb, wait);
+      };
+
+      const nextItem = () => {
+        if (done) return;
+        const used = performance.now() - t0;
+        if (used >= durationS * 1000) { finish(false, "completed"); return; }
+        if (currentIndex >= list.length) { finish(false, "list_exhausted"); return; }
+        locked = false;
+        typed = "";
+        elFb.textContent = "\u00a0";
+        elFb.className = "dst-fb";
+        dstFlash(false);
+        if (elMissing) {
+          const showRem = noAnswerStreak >= C.MISSING_STREAK;
+          elMissing.hidden = !showRem;
+        }
+        current = list[currentIndex];
+        currentIndex += 1;
+        if (elProb) elProb.textContent = current.expr;
+        renderAnswer();
+        setPadEnabled(true);
+        itemOnset = performance.now();
+        itemTimerStart = itemOnset;
+        if (elFill) elFill.style.width = "100%";
+        clearTimeout(timer);
+        const remainBlock = durationS * 1000 - (itemOnset - t0);
+        const thisLimit = Math.max(0, Math.min(limitMs, remainBlock));
+        timer = setTimeout(() => {
+          if (remainBlock <= limitMs + 16 && (performance.now() - t0) >= durationS * 1000 - 30) {
+            respond("block_end", typed);
+          } else {
+            respond("timeout", typed);
+          }
+        }, thisLimit);
+        onEvent && onEvent("dst_item_onset", {
+          variant: variant, list_id: listId, idx: responses.length + 1,
+          item_index: current.idx, problem: current.expr, limit_ms: thisLimit,
+          source: current.source || "study_list",
+        });
+      };
+
+      const tick = (now) => {
+        if (done) return;
+        const left = durationS * 1000 - (now - t0);
+        if (elClock && !elClock.hidden) elClock.textContent = fmtClock(left);
+        if (!locked && current && elFill) {
+          const frac = Math.max(0, 1 - (now - itemTimerStart) / limitMs);
+          elFill.style.width = (100 * frac) + "%";
+        }
+        if (left <= 0 && !locked) {
+          if (current && typed === "") { respond("block_end", ""); return; }
+          if (current) { respond("block_end", typed); return; }
+          finish(false, "completed");
+          return;
+        }
+        raf = requestAnimationFrame(tick);
+      };
+
+      const acceptDigit = (d) => {
+        if (locked || done || !current) return;
+        const next = typed + String(d);
+        const need = String(current.answer).length;
+        typed = next.slice(0, need);
+        renderAnswer();
+        if (typed.length >= need) respond("answer", typed);
+      };
+
+      const onKey = (e) => {
+        if (done) return;
+        if (e.key === "Escape") { e.preventDefault(); finish(true, "skipped"); return; }
+        if (locked) return;
+        if (e.key >= "0" && e.key <= "9") {
+          e.preventDefault();
+          acceptDigit(e.key);
+        }
+      };
+
+      buttons.forEach((b) => {
+        b.addEventListener("click", () => {
+          if (locked || done) return;
+          acceptDigit(b.getAttribute("data-digit"));
+        });
+      });
+
+      document.addEventListener("keydown", onKey, true);
+      activeSkip = () => finish(true, "skipped");
+      onEvent && onEvent("dst_onset", {
+        variant: variant, list_id: listId, duration_s: durationS,
+        limit_ms: limitMs, average_marker_pct: avgPct,
+        n_items: list.length, wordingVersion: C.wordingVersion || WORDING_VERSION,
+        protocol: "dst_norden_2022",
+      });
+      updateBar();
+      lastTickSafe();
+      function lastTickSafe() {
+        raf = requestAnimationFrame(tick);
+        nextItem();
+      }
+    });
+  }
+
+  function dstSummaryHtml(summary) {
+    const s = summary || {};
+    const you = s.your_pct == null ? 0 : s.your_pct;
+    const avg = s.average_marker_pct == null ? 75 : s.average_marker_pct;
+    const n = s.n_responses || 0;
+    const ok = s.n_correct || 0;
+    return `<p class="dst-kicker">Performance check</p>
+      <h2 class="dst-title">Your results</h2>
+      <p>Your accuracy: <strong>${you}%</strong> (${ok} of ${n} problems correct).</p>
+      <p>Comparison average: <strong>${avg}%</strong>.</p>`;
+  }
+
   window.WFStress = {
     run: run, runPrep: runPrep, runQuiet: runQuiet, runMist: runMist, skipCurrent: requestSkip,
+    runDstAnticipation: runDstAnticipation, runDstCountdown: runDstCountdown, runDst: runDst,
+    dstSummaryHtml: dstSummaryHtml, DST_LISTS: DST_LISTS, DST_DEFAULTS: DST_DEFAULTS, DST_COPY: DST_COPY,
     generateProblem: generateProblem, WORDING_VERSION: WORDING_VERSION,
     PREP_COPY: PREP_COPY, MIST_DEFAULTS: MIST_DEFAULTS, MIST_COPY: MIST_COPY,
     DEBRIEF_COPY: DEBRIEF_COPY,
   };
+
 })();
