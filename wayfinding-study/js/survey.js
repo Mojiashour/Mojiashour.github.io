@@ -65,8 +65,15 @@
       (labHtml ? `<span class="lh-lab">${labHtml}</span>` : "");
   }
 
+  let activeSkip = null;
+  function skipCurrent() {
+    if (typeof activeSkip === "function") { activeSkip(); return true; }
+    return false;
+  }
+
   function run(host, inst, ctx) {
     return new Promise((resolve) => {
+      const admin = !!(ctx && ctx.admin);
       const onset = performance.now();
       const state = {}; // itemId -> {value, label, other, first, last, firstIso, lastIso, n, pageOnset}
       const items = [];
@@ -241,16 +248,21 @@
           if (matrix) html += `</tbody></table>`;
         });
         html += `<p class="survey-err" hidden>Please answer all questions on this page before continuing.</p>
-          <div class="btn-row"><button type="button" class="survey-next">${isLast ? "Continue" : "Next"}</button></div></div>`;
+          <div class="btn-row"><button type="button" class="survey-next">${isLast ? "Continue" : "Next"}</button>` +
+          (admin ? `<button type="button" class="secondary survey-skip">Skip questionnaire</button>` : "") +
+          `</div></div>`;
         host.innerHTML = html;
         host.scrollTop = 0;
         window.scrollTo(0, 0);
         bindInputs();
         restorePage(slice);
         host.querySelector(".survey-next").addEventListener("click", onNext);
+        const skipBtn = host.querySelector(".survey-skip");
+        if (skipBtn) skipBtn.addEventListener("click", () => finish({ skipped: 1 }));
       };
 
-      const finish = () => {
+      const finish = (extra) => {
+        activeSkip = null;
         const submit = performance.now(), submitIso = new Date().toISOString();
         const values = {};
         const rows = items.map((it) => {
@@ -271,14 +283,15 @@
             pages_total: pages.length,
           };
         });
-        resolve({ rows, values, presentedOrder, onsetPerf: onset, submitPerf: submit, duration_ms: Math.round(submit - onset) });
+        resolve({ rows, values, presentedOrder, onsetPerf: onset, submitPerf: submit, duration_ms: Math.round(submit - onset), skipped: !!(extra && extra.skipped) });
       };
+      activeSkip = () => finish({ skipped: 1 });
 
       const onNext = () => {
         const slice = pages[pageI];
         const missing = slice.filter((it) => it._req && (state[it.id] == null || state[it.id].value === "" || state[it.id].value == null));
         host.querySelectorAll(".q.missing").forEach((q) => q.classList.remove("missing"));
-        if (missing.length) {
+        if (missing.length && !admin) {
           missing.forEach((it) => { const q = host.querySelector(`.q[data-item="${it.id}"]`); if (q) q.classList.add("missing"); });
           host.querySelector(".survey-err").hidden = false;
           const q0 = host.querySelector(`.q[data-item="${missing[0].id}"]`); if (q0) q0.scrollIntoView({ block: "center" });
@@ -315,5 +328,5 @@
     });
   }
 
-  window.WFSurvey = { run, autofill, paginate };
+  window.WFSurvey = { run, autofill, paginate, skipCurrent };
 })();

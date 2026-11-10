@@ -1,4 +1,5 @@
 /**
+ * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
  * Wayfinding SPA v4.5 — visual restyle to match moji-ashour.com; task logic unchanged from v4.4.
  * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
  * a MIST-style stress induction (Dedovic et al., 2005; original HTML/JS, not Inquisit) before each
@@ -104,6 +105,8 @@
     TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
     TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
     TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
+    // v4.6 participant default. One constant; ?transStyle= or the admin dropdown can change it.
+    DEFAULT_TRANS_STYLE: "A",
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
     WORDING_VERSION: "DRAFT_IRB_2026-11-09_v44",
@@ -188,7 +191,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.4",
+    appVersion: "v4.6",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -230,16 +233,44 @@
     if (name === "trial" && pano) pano.resize();
     window.scrollTo(0, 0);
   }
-  /** 12-character Crockford base32 ID from crypto.getRandomValues (60 bits, unbiased). */
+  /** 12-character Crockford base32 token from crypto.getRandomValues (60 bits, unbiased). */
   const CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  function uid() {
+  const PID_MAX_LEN = 40;
+  function randomToken() {
     const bytes = new Uint8Array(12);
     crypto.getRandomValues(bytes);
     let s = "";
     for (let i = 0; i < 12; i++) s += CROCKFORD32[bytes[i] % 32]; // 256 is divisible by 32
     return s;
   }
-  /** Lowest bit of FNV-1a hash of the ID; used to counterbalance condition order. */
+  /** Local calendar date as MM_DD_YYYY (participant's timezone). */
+  function localDatePrefix() {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return mm + "_" + dd + "_" + d.getFullYear();
+  }
+  /** Auto ID: MM_DD_YYYY_ + 12-char token, e.g. 11_09_2026_A99B6SSJ93KW. */
+  function uid() { return localDatePrefix() + "_" + randomToken(); }
+  /** The 12-character random part used for condition-order counterbalancing. */
+  function randomIdPart(pid) {
+    const s = String(pid || "").replace(/^DEMO_/, "");
+    const m = s.match(/_([A-Za-z0-9]{12})$/);
+    if (m) return m[1];
+    if (/^[A-Za-z0-9]{12}$/.test(s)) return s;
+    return s;
+  }
+  function sanitizePid(raw) {
+    return String(raw || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, PID_MAX_LEN);
+  }
+  function normalizeParticipantId(typedId) {
+    let typed = sanitizePid(typedId);
+    if (!typed) typed = uid();
+    else if (/^[A-Za-z0-9]{12}$/.test(typed)) typed = localDatePrefix() + "_" + typed;
+    if (adminMode && adminSavesOn && !typed.startsWith("DEMO_")) typed = "DEMO_" + typed;
+    return typed.slice(0, PID_MAX_LEN);
+  }
+  /** Lowest bit of FNV-1a hash of the 12-char random part; used to counterbalance condition order. */
   function idHashBit(str) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) {
@@ -247,6 +278,135 @@
       h = Math.imul(h, 16777619);
     }
     return (h >>> 0) & 1;
+  }
+  function orderBit(pid) { return idHashBit(randomIdPart(pid || "")); }
+
+  /* ---------- v4.6 transition styles + admin mode ---------- */
+  const TRANS_STYLE_ALIASES = {
+    A: "A", fade: "A",
+    "A+": "A+", fadeProgress: "A+", fadeplus: "A+", "fade+": "A+",
+    B: "B", dash: "B",
+    C: "C", cut: "C",
+    W: "W", walk: "W",
+  };
+  function parseTransStyle(v) {
+    const s = String(v == null ? "" : v).trim();
+    return TRANS_STYLE_ALIASES[s] || TRANS_STYLE_ALIASES[s.toUpperCase()] || CONFIG.DEFAULT_TRANS_STYLE || "A";
+  }
+  let liveTransStyle = parseTransStyle(params.get("transStyle") || CONFIG.DEFAULT_TRANS_STYLE);
+  let entryTransStyle = null; // snapshot taken at exit, used for the matching entry
+  function currentTransStyle() { return liveTransStyle; }
+  function setLiveTransStyle(v) {
+    liveTransStyle = parseTransStyle(v);
+    return liveTransStyle;
+  }
+
+  let adminMode = false;
+  let adminSavesOn = false;
+  let pendingJump = null;
+  let skipConditionFlag = false;
+  const adminWaiters = new Set();
+  function adminSignal(kind, detail) {
+    Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
+  }
+  function onAdminSignal(fn) {
+    adminWaiters.add(fn);
+    return () => adminWaiters.delete(fn);
+  }
+  function throwIfJump() {
+    if (!pendingJump) return;
+    const j = pendingJump;
+    pendingJump = null;
+    const err = new Error("admin_jump");
+    err.adminJump = j;
+    throw err;
+  }
+  function applyAdminPrefix() {
+    if (!adminMode || !adminSavesOn || !session.participantId) return;
+    if (!session.participantId.startsWith("DEMO_")) {
+      session.participantId = ("DEMO_" + session.participantId).slice(0, PID_MAX_LEN);
+    }
+  }
+  function requestSkip() {
+    logEvent("admin_skip", { phase: currentPhase });
+    if (window.WFSurvey && typeof window.WFSurvey.skipCurrent === "function") window.WFSurvey.skipCurrent();
+    if (window.WFStress && typeof window.WFStress.skipCurrent === "function") window.WFStress.skipCurrent();
+    adminSignal("skip");
+  }
+  function requestJump(target) {
+    if (!target) return;
+    pendingJump = target;
+    skipConditionFlag = true;
+    logEvent("admin_jump", { target: target, phase: currentPhase });
+    if (window.WFSurvey && typeof window.WFSurvey.skipCurrent === "function") window.WFSurvey.skipCurrent();
+    if (window.WFStress && typeof window.WFStress.skipCurrent === "function") window.WFStress.skipCurrent();
+    eventQueue = [];
+    pendingSegments = [];
+    const r = segmentDone; segmentDone = null;
+    if (r) r();
+    adminSignal("jump");
+  }
+  function requestSkipBlock() {
+    logEvent("admin_skip_block", { phase: currentPhase, leftover: eventQueue.length });
+    eventQueue = [];
+    choiceEnabled = false;
+    currentEvent = null;
+    clearTransitionVisuals();
+    const r = segmentDone; segmentDone = null;
+    if (r) r();
+  }
+  function requestSkipCondition() {
+    logEvent("admin_skip_condition", { phase: currentPhase });
+    skipConditionFlag = true;
+    if (window.WFSurvey && typeof window.WFSurvey.skipCurrent === "function") window.WFSurvey.skipCurrent();
+    requestSkipBlock();
+    adminSignal("skip");
+  }
+  function initAdminBar() {
+    try { adminMode = sessionStorage.getItem("wf_admin") === "1"; } catch (e) { adminMode = false; }
+    const bar = $("admin-bar");
+    if (!adminMode) {
+      if (bar) bar.hidden = true;
+      return;
+    }
+    document.body.classList.add("admin");
+    if (bar) bar.hidden = false;
+    const trans = $("admin-trans");
+    if (trans) {
+      if (![].some.call(trans.options, (o) => o.value === liveTransStyle)) {
+        // keep current selection if option exists
+      }
+      trans.value = liveTransStyle;
+      trans.addEventListener("change", () => {
+        const v = setLiveTransStyle(trans.value);
+        trans.value = v;
+        logEvent("admin_trans_style", { transStyle: v });
+      });
+    }
+    const saves = $("admin-saves");
+    if (saves) {
+      saves.checked = adminSavesOn;
+      saves.addEventListener("change", () => {
+        adminSavesOn = !!saves.checked;
+        applyAdminPrefix();
+        logEvent("admin_saves", { on: adminSavesOn ? 1 : 0, participantId: session.participantId || "" });
+      });
+    }
+    const jump = $("admin-jump");
+    if (jump) {
+      jump.addEventListener("change", () => {
+        const v = jump.value;
+        jump.value = "";
+        if (v) requestJump(v);
+      });
+    }
+    if ($("admin-skip")) $("admin-skip").addEventListener("click", requestSkip);
+    if ($("admin-skip-block")) $("admin-skip-block").addEventListener("click", requestSkipBlock);
+    if ($("admin-skip-cond")) $("admin-skip-cond").addEventListener("click", requestSkipCondition);
+  }
+  function ensureSessionStarted(s) {
+    if (s && session.participantId) return s;
+    return beginSession("");
   }
   const isoNow = () => new Date().toISOString();
   function escapeHtml(s) {
@@ -271,6 +431,10 @@
   let lastSave = { ok: null, adapter: "", error: "" };
   function autosave(reason) {
     if (!session.participantId) return Promise.resolve(lastSave);
+    if (adminMode && !adminSavesOn) {
+      lastSave = { ok: true, adapter: "admin_off", error: "" };
+      return Promise.resolve(lastSave);
+    }
     const json = JSON.stringify(session);
     try { localStorage.setItem("wf_v44_" + session.participantId, json); } catch (e) { /* quota: ignore */ }
     const meta = {
@@ -411,8 +575,8 @@
   function chooseOrder(rnd) {
     const draw = rnd(); // always consumed (as in v3) so block/trial orders for a given seed do not depend on the source
     const p = params.get("order");
-    if (p === "NA" || p === "AN") return { order: p, source: "url", idBit: idHashBit(session.participantId) };
-    const bit = idHashBit(session.participantId || "");
+    if (p === "NA" || p === "AN") return { order: p, source: "url", idBit: orderBit(session.participantId) };
+    const bit = orderBit(session.participantId || "");
     return { order: bit ? "NA" : "AN", source: "id_hash_bit", idBit: bit };
   }
 
@@ -459,7 +623,7 @@
             intendedRenderId: intendedRender(cond, b.layout),
             boardId: b.board_id, correctDirection: b.correct_side, destination: b.destination,
             prompt: `Find the way to ${b.destination}. Press ← or →.`,
-            stimulusPlaceholder: placeholder ? 1 : 0 });
+            stimulusPlaceholder: placeholder ? 1 : 0, nDecisionsInBlock: n });
           if (probeAfter.indexOf(i + 1) >= 0) {
             probeSerial++;
             queue.push({ kind: "probe", trialIndex: 1000 + probeSerial, isPractice: false,
@@ -637,11 +801,55 @@
   function clearTransitionVisuals() {
     setPanoBlur(0);
     setOverlayOpacity(0);
+    setVignette(false);
+    hideIntersectionLabel();
     fadeCovered = false;
     transitionBusy = false;
     if (pano) pano.interactive = true;
   }
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+  function setVignette(on) {
+    const el = $("vignette-overlay");
+    if (!el) return;
+    el.classList.toggle("on", !!on);
+  }
+  async function pulseVignette(ms) {
+    const dur = ms == null ? 150 : ms;
+    setVignette(true);
+    await sleep(Math.max(40, Math.round(dur / 2)));
+    setVignette(false);
+    await sleep(Math.max(40, Math.round(dur / 2)));
+  }
+  function intersectionCaption(ev) {
+    if (!ev || ev.kind !== "decision") return "";
+    if (ev.isPractice) return ev.trainingId ? ("Practice " + ev.trainingId) : "Practice";
+    const n = ev.nDecisionsInBlock || CONFIG.TRIALS_PER_BLOCK;
+    const i = ev.blockPos || ev.trialIndex || 0;
+    return "Intersection " + i + " of " + n;
+  }
+  function showIntersectionLabel(ev) {
+    const el = $("intersection-label");
+    if (!el) return;
+    const text = intersectionCaption(ev);
+    if (!text) { el.hidden = true; el.textContent = ""; return; }
+    el.textContent = text;
+    el.hidden = false;
+  }
+  function hideIntersectionLabel() {
+    const el = $("intersection-label");
+    if (el) { el.hidden = true; el.textContent = ""; }
+  }
+  function animateOverlay(from, to, ms) {
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const step = (now) => {
+        const u = ms <= 0 ? 1 : Math.min(1, (now - t0) / ms);
+        setOverlayOpacity(from + (to - from) * u);
+        if (u < 1) requestAnimationFrame(step); else resolve();
+      };
+      requestAnimationFrame(step);
+    });
+  }
   async function ensureEventAssets(ev) {
     if (!ev || ev.kind !== "decision") return { waited: 0 };
     const v = ensureViewer();
@@ -657,115 +865,178 @@
     await Promise.all(need);
     return { waited: Math.round(performance.now() - t0) };
   }
-  /** Exit half: walk forward (yaw + zoom-in), blur and fade out. RT already stamped at key press. */
+  /** Exit half. RT already stamped at key press. Style is snapshotted for the matching entry. */
   async function playExitTransition(choice) {
-    const dur = CONFIG.TRANS_MS;
+    const style = currentTransStyle();
+    entryTransStyle = style;
     const next = peekNextEvent();
     const preload = await ensureEventAssets(next);
     setDecisionUI(false);
     choiceEnabled = false;
-    if (!dur || dur <= 0 || !pano) {
+    if (CONFIG.TRANS_MS === 0) {
       fadeCovered = false;
       transitionBusy = false;
       const pad = 150 - preload.waited;
       if (pad > 0) await sleep(pad);
-      return { disabled: 1, preload_wait_ms: preload.waited };
+      return { disabled: 1, preload_wait_ms: preload.waited, transStyle: style };
     }
     transitionBusy = true;
-    const outMs = Math.max(160, Math.round(dur * (CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC)));
     const t0 = performance.now();
-    logEvent("transition_start", {
-      choice: choice, duration_ms: dur, out_ms: outMs, phase: "out",
-      nextKind: next && next.kind || "", preload_wait_ms: preload.waited,
-      base_hfov: CONFIG.HFOV, mid_hfov: CONFIG.TRANS_HFOV,
-    });
-    pano.interactive = false;
-    const targetYaw = choice === "left" ? -CONFIG.TRANS_YAW : CONFIG.TRANS_YAW;
     const overlay = transOverlay();
     if (overlay) overlay.classList.add("on");
-    try {
-      await pano.animateTo({
-        yaw: targetYaw, pitch: 0, hfov: CONFIG.TRANS_HFOV,
-        duration: outMs, bobAmp: CONFIG.TRANS_BOB, bobCycles: CONFIG.TRANS_BOB_CYCLES,
-        ease: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-      }, (t) => {
-        const b = Math.max(0, Math.min(1, (t - 0.18) / 0.72));
-        setPanoBlur(3.2 * b);
-        const f = Math.max(0, Math.min(1, (t - 0.50) / 0.50));
-        setOverlayOpacity(f * f);
-      });
-    } catch (err) {
-      console.error("[transition]", err);
+    logEvent("transition_start", {
+      choice: choice, phase: "out", transStyle: style,
+      nextKind: next && next.kind || "", preload_wait_ms: preload.waited,
+      base_hfov: CONFIG.HFOV,
+    });
+    if (pano) pano.interactive = false;
+
+    if (style === "C") {
+      setOverlayOpacity(1);
+      fadeCovered = true;
+    } else if (style === "A" || style === "A+") {
+      if (style === "A+") showIntersectionLabel(next && next.kind === "decision" ? next : null);
+      await animateOverlay(0, 1, 200);
+      setOverlayOpacity(1);
+      fadeCovered = true;
+    } else if (style === "B") {
+      const dashHfov = Math.max(70, Math.round(CONFIG.HFOV - 12));
+      try {
+        if (pano) {
+          const yaw = (typeof pano.getYaw === "function") ? pano.getYaw() : CONFIG.START_YAW;
+          const pitch = (typeof pano.getPitch === "function") ? pano.getPitch() : 0;
+          await pano.animateTo({
+            yaw: yaw, pitch: pitch, hfov: dashHfov,
+            duration: 300, bobAmp: 0, bobCycles: 0, ease: (u) => u,
+          }, (u) => {
+            const f = Math.max(0, Math.min(1, (u - 0.55) / 0.45));
+            setOverlayOpacity(f * f);
+          });
+        } else {
+          await sleep(300);
+        }
+      } catch (err) { console.error("[transition-b]", err); }
+      setOverlayOpacity(1);
+      fadeCovered = true;
+    } else {
+      // W · current v4.4 walking animation
+      const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
+      const outMs = Math.max(160, Math.round(dur * (CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC)));
+      const targetYaw = choice === "left" ? -CONFIG.TRANS_YAW : CONFIG.TRANS_YAW;
+      try {
+        if (pano) {
+          await pano.animateTo({
+            yaw: targetYaw, pitch: 0, hfov: CONFIG.TRANS_HFOV,
+            duration: outMs, bobAmp: CONFIG.TRANS_BOB, bobCycles: CONFIG.TRANS_BOB_CYCLES,
+            ease: (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2),
+          }, (u) => {
+            const b = Math.max(0, Math.min(1, (u - 0.18) / 0.72));
+            setPanoBlur(3.2 * b);
+            const f = Math.max(0, Math.min(1, (u - 0.50) / 0.50));
+            setOverlayOpacity(f * f);
+          });
+        } else {
+          await sleep(outMs);
+        }
+      } catch (err) { console.error("[transition]", err); }
+      setPanoBlur(3.2);
+      setOverlayOpacity(1);
+      fadeCovered = true;
     }
-    setPanoBlur(3.2);
-    setOverlayOpacity(1);
-    fadeCovered = true;
     logEvent("transition_end", {
       choice: choice, elapsed_ms: Math.round(performance.now() - t0),
-      phase: "out", preload_wait_ms: preload.waited,
+      phase: "out", preload_wait_ms: preload.waited, transStyle: style,
     });
-    return { disabled: 0, preload_wait_ms: preload.waited, elapsed_ms: Math.round(performance.now() - t0), out_ms: outMs };
+    return { disabled: 0, preload_wait_ms: preload.waited, elapsed_ms: Math.round(performance.now() - t0), transStyle: style };
   }
 
   /**
-   * Entry half: new scene loads under the white overlay starting slightly WIDE (base FOV + ~14°),
-   * faded and blurred, then narrows to base FOV while fading in and sharpening — continues forward
-   * motion (not zooming out / backing up). Exit half is unchanged (narrow mid zoom).
-   * Choice keys stay ignored until this resolves; decision_onset is scheduled by the caller afterward.
+   * Entry half for the snapshotted style. Choice keys stay ignored until this resolves;
+   * decision_onset is scheduled by the caller afterward (RT clock starts once fully visible).
    */
   async function playEnterTransition() {
     if (!fadeCovered) { transitionBusy = false; return { skipped: 1 }; }
-    const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
-    const outFrac = CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC;
-    const inMs = Math.max(160, Math.round(dur * (1 - outFrac)));
-    const enterHfov = CONFIG.TRANS_ENTER_HFOV != null ? CONFIG.TRANS_ENTER_HFOV : Math.min(140, CONFIG.HFOV + 14);
+    const style = entryTransStyle || currentTransStyle();
     const t0 = performance.now();
     transitionBusy = true;
     setDecisionUI(false);
     choiceEnabled = false;
-    if (pano) {
-      pano.interactive = false;
-      // Start wide under the cover, then walk forward into base FOV
-      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, enterHfov);
-    }
-    setPanoBlur(3.2);
-    setOverlayOpacity(1);
     const overlay = transOverlay();
     if (overlay) overlay.classList.add("on");
-    logEvent("transition_start", {
-      phase: "in", duration_ms: dur, in_ms: inMs,
-      base_hfov: CONFIG.HFOV, enter_hfov: enterHfov, exit_mid_hfov: CONFIG.TRANS_HFOV,
-    });
-    try {
+
+    const finishEnter = () => {
+      setPanoBlur(0);
+      setOverlayOpacity(0);
+      setVignette(false);
+      hideIntersectionLabel();
+      fadeCovered = false;
+      transitionBusy = false;
       if (pano) {
-        await pano.animateTo({
-          yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: CONFIG.HFOV,
-          duration: inMs,
-          bobAmp: CONFIG.TRANS_BOB * 0.7,
-          bobCycles: Math.max(1.2, CONFIG.TRANS_BOB_CYCLES * 0.7),
-          ease: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-        }, (t) => {
-          const b = Math.max(0, 1 - Math.min(1, (t - 0.05) / 0.75));
-          setPanoBlur(3.2 * b);
-          const f = Math.max(0, 1 - Math.min(1, (t - 0.08) / 0.70));
-          setOverlayOpacity(f * f);
-        });
+        pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+        pano.interactive = true;
+      }
+    };
+
+    try {
+      if (style === "C") {
+        if (pano) {
+          pano.interactive = false;
+          pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+        }
+        setPanoBlur(0);
+        setOverlayOpacity(0);
+        await pulseVignette(150);
+      } else if (style === "A" || style === "A+") {
+        if (pano) {
+          pano.interactive = false;
+          pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+        }
+        setPanoBlur(0);
+        setOverlayOpacity(1);
+        if (style === "A+") showIntersectionLabel(currentEvent);
+        await animateOverlay(1, 0, 200);
+      } else if (style === "B") {
+        if (pano) {
+          pano.interactive = false;
+          pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+        }
+        setPanoBlur(0);
+        setOverlayOpacity(1);
+        await animateOverlay(1, 0, 150);
       } else {
-        await sleep(inMs);
+        const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
+        const outFrac = CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC;
+        const inMs = Math.max(160, Math.round(dur * (1 - outFrac)));
+        const enterHfov = CONFIG.TRANS_ENTER_HFOV != null ? CONFIG.TRANS_ENTER_HFOV : Math.min(140, CONFIG.HFOV + 14);
+        if (pano) {
+          pano.interactive = false;
+          pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, enterHfov);
+        }
+        setPanoBlur(3.2);
+        setOverlayOpacity(1);
+        if (pano) {
+          await pano.animateTo({
+            yaw: CONFIG.START_YAW, pitch: CONFIG.START_PITCH, hfov: CONFIG.HFOV,
+            duration: inMs,
+            bobAmp: CONFIG.TRANS_BOB * 0.7,
+            bobCycles: Math.max(1.2, CONFIG.TRANS_BOB_CYCLES * 0.7),
+            ease: (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2),
+          }, (u) => {
+            const b = Math.max(0, 1 - Math.min(1, (u - 0.05) / 0.75));
+            setPanoBlur(3.2 * b);
+            const f = Math.max(0, 1 - Math.min(1, (u - 0.08) / 0.70));
+            setOverlayOpacity(f * f);
+          });
+        } else {
+          await sleep(inMs);
+        }
       }
     } catch (err) {
       console.error("[transition-in]", err);
     }
-    setPanoBlur(0);
-    setOverlayOpacity(0);
-    fadeCovered = false;
-    transitionBusy = false;
-    if (pano) {
-      pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
-      pano.interactive = true;
-    }
-    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in", in_ms: inMs, enter_hfov: enterHfov });
-    return { skipped: 0, in_ms: inMs, elapsed_ms: Math.round(performance.now() - t0) };
+    finishEnter();
+    logEvent("transition_end", { elapsed_ms: Math.round(performance.now() - t0), phase: "in", transStyle: style });
+    return { skipped: 0, elapsed_ms: Math.round(performance.now() - t0), transStyle: style };
   }
 
   function startDecisionTrial(spec) {
@@ -792,7 +1063,8 @@
       $("loading-overlay").classList.remove("visible", "error");
       // If mid-corridor, start slightly WIDE then narrow to base (forward); else open at base FOV.
       const entering = !!fadeCovered;
-      const startHfov = entering
+      const style = entering ? (entryTransStyle || currentTransStyle()) : null;
+      const startHfov = (entering && style === "W")
         ? (CONFIG.TRANS_ENTER_HFOV != null ? CONFIG.TRANS_ENTER_HFOV : Math.min(140, CONFIG.HFOV + 14))
         : CONFIG.HFOV;
       setDecisionUI(false);
@@ -914,6 +1186,7 @@
       cueType: b ? b.cue_type : "",
       legacySceneId: LEGACY_SCENE_ID[ev.renderId] || "",
       panoRes: CONFIG.RES,
+      transStyle: entryTransStyle || currentTransStyle(),
       timestamp: isoNow(),
     };
     session.trials.push(row);
@@ -957,6 +1230,7 @@
       yaw_at_response: "",
       probeLag: CONFIG.PROBE_LAG,
       referencedTrialIndex: ev.referencedTrialIndex,
+      transStyle: currentTransStyle(),
       timestamp: isoNow(),
     };
     session.trials.push(row);
@@ -990,6 +1264,16 @@
   function page(html, buttons, opts) {
     return new Promise((resolve) => {
       const o = opts || {};
+      let settled = false;
+      const done = (id) => {
+        if (settled) return;
+        settled = true;
+        if (typeof off === "function") off();
+        resolve(id);
+      };
+      const off = onAdminSignal((kind) => {
+        if (kind === "skip" || kind === "jump") done(kind === "jump" ? "admin-jump" : "admin-skip");
+      });
       pageHost().innerHTML = `<div class="page ${o.cls || ""}">${html}<div class="btn-row">` +
         buttons.map((b) => `<button type="button" data-btn="${b.id}" class="${b.cls || ""}" ${b.disabled ? "disabled" : ""}>${escapeHtml(b.label)}</button>`).join("") +
         `</div></div>`;
@@ -997,7 +1281,7 @@
       if (o.onShow) o.onShow(pageHost());
       pageHost().querySelectorAll("button[data-btn]").forEach((el) => el.addEventListener("click", () => {
         if (o.validate && !o.validate(el.dataset.btn)) return;
-        resolve(el.dataset.btn);
+        done(el.dataset.btn);
       }));
     });
   }
@@ -1009,14 +1293,18 @@
     logEvent("questionnaire_onset", { instrument: instId, administration });
     const res = await window.WFSurvey.run(pageHost(), inst, {
       stepLabel, rnd: surveyRnd, onEvent: (t, x) => logEvent(t, x),
+      admin: adminMode,
     });
+    throwIfJump();
+    if (!res) return null;
     const ctx = { participantId: session.participantId, seed: session.seed, conditionOrder: session.conditionOrder,
       phase: currentPhase, administration, ...(extra || {}) };
-    res.rows.forEach((r) => session.responses.push({ ...ctx, ...r }));
-    const sc = SCORE[instId] ? SCORE[instId](res.values, { screenItem13Excludes: CONFIG.SCREEN_ITEM13_EXCLUDES }) : {};
+    (res.rows || []).forEach((r) => session.responses.push({ ...ctx, ...r }));
+    const sc = SCORE[instId] ? SCORE[instId](res.values || {}, { screenItem13Excludes: CONFIG.SCREEN_ITEM13_EXCLUDES }) : {};
     session.scores.push({ ...ctx, instrument: instId, duration_ms: res.duration_ms,
-      presentedOrder: res.presentedOrder.join(" "), submit_time: res.rows.length ? res.rows[0].submit_time : isoNow(), ...sc });
-    logEvent("questionnaire_offset", { instrument: instId, administration, duration_ms: res.duration_ms });
+      presentedOrder: (res.presentedOrder || []).join(" "), submit_time: res.rows && res.rows.length ? res.rows[0].submit_time : isoNow(),
+      skipped: res.skipped ? 1 : 0, ...sc });
+    logEvent("questionnaire_offset", { instrument: instId, administration, duration_ms: res.duration_ms, skipped: res.skipped ? 1 : 0 });
     autosave(instId + "_" + administration);
     return { ...res, score: sc };
   }
@@ -1098,13 +1386,18 @@
         <p class="hint exp-note">Experimenter: Esc skips.</p></div>`;
       showScreen("page");
       let tm = null;
+      let offAdmin = null;
       const end = (skipped) => {
+        if (end._done) return;
+        end._done = true;
         clearTimeout(tm); document.removeEventListener("keydown", onKey);
+        if (typeof offAdmin === "function") offAdmin();
         logEvent("rest_offset", { label, skipped: skipped ? 1 : 0, actual_ms: Math.round(performance.now() - t0) });
         resolve();
       };
       const onKey = (e) => { if (e.key === "Escape") end(true); };
       document.addEventListener("keydown", onKey);
+      offAdmin = onAdminSignal((kind) => { if (kind === "skip" || kind === "jump") end(true); });
       tm = setTimeout(() => end(false), dur * 1000);
     });
   }
@@ -1121,11 +1414,14 @@
 
   /* ---------- individual steps ---------- */
   function beginSession(typedId) {
-    const typed = (typedId || "").trim().replace(/[^A-Za-z0-9_-]/g, "");
-    session.participantId = typed || uid();
-    session.participantIdSource = typed ? "experimenter" : "auto_crypto";
-    session.idAlphabet = typed ? "experimenter_charset" : "crockford_base32";
+    const typedRaw = (typedId || "").trim();
+    session.participantId = normalizeParticipantId(typedRaw);
+    session.participantIdSource = typedRaw ? "experimenter" : "auto_crypto";
+    session.idAlphabet = typedRaw ? "experimenter_charset" : "crockford_base32";
+    session.idRandomPart = randomIdPart(session.participantId);
     session.idLength = session.participantId.length;
+    session.adminMode = adminMode ? 1 : 0;
+    session.transStyleDefault = currentTransStyle();
     session.seed = params.has("seed") ? (+params.get("seed") >>> 0) : crypto.getRandomValues(new Uint32Array(1))[0];
     session.startedAt = isoNow();
     surveyRnd = mulberry32((session.seed ^ 0x5a5a1234) >>> 0); // questionnaire item shuffles (SAS), separate stream
@@ -1134,7 +1430,8 @@
     session.conditionOrder = plan.order;
     session.conditionOrderSource = plan.orderSource;
     logEvent("session_start", { participantIdSource: session.participantIdSource, seed: session.seed,
-      conditionOrder: plan.order, conditionOrderSource: plan.orderSource, idBit: idHashBit(session.participantId),
+      conditionOrder: plan.order, conditionOrderSource: plan.orderSource, idBit: orderBit(session.participantId),
+      idRandomPart: session.idRandomPart, adminMode: adminMode ? 1 : 0, transStyle: currentTransStyle(),
       startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE,
       showSam: CONFIG.SHOW_SAM ? 1 : 0, showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION });
@@ -1162,14 +1459,14 @@
     const fileWarn = location.protocol === "file:"
       ? '<p class="protocol-warn">Opened as a file. Run <code>python3 tools/server.py</code> (or <code>python3 -m http.server 8080</code>) and open http://localhost:8080/.</p>'
       : "";
-    const urlPid = (params.get("pid") || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
+    const urlPid = sanitizePid(params.get("pid") || "");
     if (mode === "lab") {
       await page(`
         <p class="kicker">Lab setup</p>
         <h2>Hospital <em>Wayfinding</em> Study</h2>
         <p class="exp-note">Experimenter setup. Enter a study code if you have one (no names or initials), or leave this blank and the session will assign a unique ID.</p>
         <div class="field"><label for="participant-id">Participant ID (optional)</label>
-          <input id="participant-id" type="text" autocomplete="off" maxlength="24" placeholder="assigned automatically if blank" value="${urlPid.replace(/"/g, "")}" /></div>
+          <input id="participant-id" type="text" autocomplete="off" maxlength="40" placeholder="assigned automatically if blank" value="${urlPid.replace(/"/g, "")}" /></div>
         ${fileWarn}`,
         [{ id: "go", label: "Start session", disabled: location.protocol === "file:" }],
         { onShow: (h) => { const i = h.querySelector("#participant-id"); if (i) i.focus(); } });
@@ -1231,12 +1528,21 @@
       [{ id: "agree", label: "I agree – Continue" }, { id: "decline", label: "I do not agree", cls: "secondary" }],
       { validate: (id) => {
         if (id !== "agree") return true;
+        if (adminMode) return true;
         const v = (($("consent-date") && $("consent-date").value) || "").trim();
         const err = $("consent-date-err");
         if (!v) { if (err) err.hidden = false; return false; }
         if (err) err.hidden = true;
         return true;
       } });
+    if (btn === "admin-skip" || btn === "admin-jump") {
+      session.consent = { decision: "agreed", timestamp: isoNow(), perf: +performance.now().toFixed(1),
+        text_version: "PLACEHOLDER (no IRB text yet)", dateEntered: "admin-skip" };
+      logEvent("consent_agreed", { dateEntered: "admin-skip", admin: 1 });
+      autosave("consent");
+      throwIfJump();
+      return true;
+    }
     const dateEntered = (($("consent-date") && $("consent-date").value) || "").trim();
     session.consent = { decision: btn === "agree" ? "agreed" : "declined", timestamp: isoNow(), perf: +performance.now().toFixed(1),
       text_version: "PLACEHOLDER (no IRB text yet)", dateEntered };
@@ -1277,8 +1583,22 @@
       logEvent("preload_error", { message: String(err && err.message) });
       throw err;
     }
-    await new Promise((res) => btn.addEventListener("click", res, { once: true }));
+    if (adminMode && $("btn-skip-instructions")) $("btn-skip-instructions").hidden = false;
+    await new Promise((res) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (typeof off === "function") off();
+        res();
+      };
+      btn.addEventListener("click", finish, { once: true });
+      const skipBtn = $("btn-skip-instructions");
+      if (skipBtn) skipBtn.addEventListener("click", finish, { once: true });
+      const off = onAdminSignal((kind) => { if (kind === "skip" || kind === "jump") finish(); });
+    });
     logEvent("task_instructions_done");
+    throwIfJump();
   }
 
   async function stepLiveStress() {
@@ -1375,6 +1695,7 @@
     const copy = (window.WFStress && window.WFStress.DEBRIEF_COPY) || { title: "Debriefing", html: "<p>[PLACEHOLDER: IRB-approved debrief text.]</p>" };
     setPhase("debrief");
     await page(`<h2>${copy.title}</h2>${copy.html}`, [{ id: "go", label: "Continue" }], { cls: "debrief-page" });
+    throwIfJump();
     session.stress.debriefShown = true;
     logEvent("debrief_shown", { wordingVersion: CONFIG.WORDING_VERSION, stressMode: CONFIG.STRESS_MODE });
     // Await so this checkpoint cannot race/overwrite the final "complete" save on Drive.
@@ -1476,15 +1797,20 @@
 
   async function stepCondition(c, pos, later, nParts) {
     const parts = nParts || 2;
+    skipConditionFlag = false;
     setPhase(`condition_${pos === 1 ? "A" : "B"}`, { condition: c.condition, conditionName: COND_LABEL[c.condition] });
     await page(`<h2>Part ${pos} of ${parts}</h2>
       <p>In this part you will find your way to three destinations in the hospital, one after another.
       Before each destination you will see a short instruction.</p>`, [{ id: "go", label: "Continue" }]);
+    throwIfJump();
     logEvent("condition_onset", { condition: c.condition, conditionPosition: pos });
     const blocks = splitQueueByBlocks(c.queue);
     for (let bi = 0; bi < blocks.length; bi++) {
+      if (skipConditionFlag || pendingJump) break;
       const laterSegs = blocks.slice(bi + 1).concat(later || []);
       await runSegment(blocks[bi], laterSegs);
+      throwIfJump();
+      if (skipConditionFlag || pendingJump) break;
       const ev0 = blocks[bi][0] || {};
       setPhase(`post_block_${pos === 1 ? "A" : "B"}`, {
         condition: c.condition, block: ev0.block, blockOrder: ev0.blockOrder, destination: ev0.destination || "",
@@ -1493,7 +1819,9 @@
         condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: pos,
         block: ev0.block, blockOrder: ev0.blockOrder, destination: ev0.destination || "",
       });
+      throwIfJump();
     }
+    skipConditionFlag = false;
     // Performance summary is shown once at the end (debrief), not after each condition.
     logEvent("condition_offset", { condition: c.condition, conditionPosition: pos });
     autosave("condition_" + pos);
@@ -1533,45 +1861,128 @@
   }
 
   async function runSession() {
-    const s = await stepSetup();
-    await stepIntro();
-    if (!(await stepConsent())) return finishSession("consent_declined");
-    await stepToday();
-    setPhase("baseline");
-    await surveySet(["VAS", "SAM", "STICSA_S", "STICSA_T"], "baseline");
-    if (mode === "lab") {
-      await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
-      setPhase("rest_baseline"); await restScreen("baseline", CONFIG.REST_BASELINE_S);
-    }
-    await stepTaskInstructions();
-    setPhase("practice");
-    await runSegment(s.practice, s.condQueues.map((c) => c.queue));
-    await stepInduction("first");
-    setPhase("post_mist_1");
-    await surveySet(["VAS"], "post_mist_1");
-    const nParts = s.condQueues.length;
-    for (let i = 0; i < s.condQueues.length; i++) {
-      const c = s.condQueues[i];
-      await stepCondition(c, i + 1, s.condQueues.slice(i + 1).map((x) => x.queue), nParts);
-      setPhase(`post_condition_${i === 0 ? "A" : "B"}`, { condition: c.condition });
-      await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], i === 0 ? "post_condition_A" : "post_condition_B",
-        { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: i + 1 });
-      if (i < s.condQueues.length - 1) {
-        if (CONFIG.REST_BETWEEN_S) { setPhase("rest_between"); await restScreen("between_conditions", CONFIG.REST_BETWEEN_S); }
-        await stepInduction("second");
-        setPhase("post_mist_2");
-        await surveySet(["VAS"], "post_mist_2");
+    let s = null;
+    let cursor = "setup";
+    while (cursor) {
+      try {
+        throwIfJump();
+        if (cursor === "setup") {
+          s = await stepSetup();
+          throwIfJump();
+          cursor = "intro";
+        } else if (cursor === "intro") {
+          await stepIntro();
+          throwIfJump();
+          cursor = "consent";
+        } else if (cursor === "consent") {
+          s = s || ensureSessionStarted(s);
+          if (!(await stepConsent())) return finishSession("consent_declined");
+          throwIfJump();
+          cursor = "today";
+        } else if (cursor === "today") {
+          await stepToday();
+          throwIfJump();
+          cursor = "baseline";
+        } else if (cursor === "baseline") {
+          setPhase("baseline");
+          await surveySet(["VAS", "SAM", "STICSA_S", "STICSA_T"], "baseline");
+          throwIfJump();
+          if (mode === "lab") {
+            await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
+            throwIfJump();
+            setPhase("rest_baseline"); await restScreen("baseline", CONFIG.REST_BASELINE_S);
+            throwIfJump();
+          }
+          cursor = "instructions";
+        } else if (cursor === "instructions") {
+          await stepTaskInstructions();
+          throwIfJump();
+          cursor = "practice";
+        } else if (cursor === "practice") {
+          s = s || ensureSessionStarted(s);
+          if (preloadPromise) { try { await preloadPromise; } catch (e) { console.error("[preload]", e); } }
+          setPhase("practice");
+          await runSegment(s.practice, s.condQueues.map((c) => c.queue));
+          throwIfJump();
+          cursor = "mist";
+        } else if (cursor === "mist") {
+          s = s || ensureSessionStarted(s);
+          await stepInduction("first");
+          throwIfJump();
+          setPhase("post_mist_1");
+          await surveySet(["VAS"], "post_mist_1");
+          throwIfJump();
+          cursor = "condition1";
+        } else if (cursor === "condition1") {
+          s = s || ensureSessionStarted(s);
+          if (preloadPromise) { try { await preloadPromise; } catch (e) { console.error("[preload]", e); } }
+          const nParts = s.condQueues.length;
+          const c = s.condQueues[0];
+          await stepCondition(c, 1, s.condQueues.slice(1).map((x) => x.queue), nParts);
+          throwIfJump();
+          cursor = "post_condition";
+        } else if (cursor === "post_condition") {
+          s = s || ensureSessionStarted(s);
+          const c = s.condQueues[0];
+          setPhase("post_condition_A", { condition: c.condition });
+          await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_A",
+            { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 1 });
+          throwIfJump();
+          if (s.condQueues.length > 1) {
+            if (CONFIG.REST_BETWEEN_S) { setPhase("rest_between"); await restScreen("between_conditions", CONFIG.REST_BETWEEN_S); }
+            throwIfJump();
+            await stepInduction("second");
+            throwIfJump();
+            setPhase("post_mist_2");
+            await surveySet(["VAS"], "post_mist_2");
+            throwIfJump();
+          }
+          cursor = "condition2";
+        } else if (cursor === "condition2") {
+          s = s || ensureSessionStarted(s);
+          const nParts = s.condQueues.length;
+          if (s.condQueues.length > 1) {
+            const c = s.condQueues[1];
+            await stepCondition(c, 2, [], nParts);
+            throwIfJump();
+            setPhase("post_condition_B", { condition: c.condition });
+            await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_B",
+              { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 2 });
+            throwIfJump();
+          }
+          cursor = "exit";
+        } else if (cursor === "exit") {
+          s = s || ensureSessionStarted(s);
+          setPhase("post_experiment");
+          await surveySet(["SBSOD", "SAS", "EHI", "DEMO"], "post_experiment");
+          throwIfJump();
+          // MRT: UNDECIDED (CONFIG.MRT = "pending"). Disabled module slot; no MRT items are included in v4.
+          if (CONFIG.MRT !== "pending") logEvent("mrt_slot", { status: CONFIG.MRT });
+          else logEvent("mrt_slot", { status: "pending_disabled" });
+          await stepEndMath();
+          throwIfJump();
+          await stepInterview();
+          throwIfJump();
+          await stepDebrief();
+          throwIfJump();
+          cursor = "results";
+        } else if (cursor === "results") {
+          finishSession((session.stress && session.stress.debriefShown) ? "completed" : "admin_jump");
+          cursor = null;
+        } else {
+          cursor = null;
+        }
+      } catch (e) {
+        if (!e || !e.adminJump) throw e;
+        const j = e.adminJump;
+        pendingJump = null;
+        skipConditionFlag = false;
+        s = s || ensureSessionStarted(s);
+        if (preloadPromise) { try { await preloadPromise; } catch (err) { console.error("[preload]", err); } }
+        cursor = j;
+        logEvent("admin_jump_resume", { target: j });
       }
     }
-    setPhase("post_experiment");
-    await surveySet(["SBSOD", "SAS", "EHI", "DEMO"], "post_experiment");
-    // MRT: UNDECIDED (CONFIG.MRT = "pending"). Disabled module slot; no MRT items are included in v4.
-    if (CONFIG.MRT !== "pending") logEvent("mrt_slot", { status: CONFIG.MRT });
-    else logEvent("mrt_slot", { status: "pending_disabled" });
-    await stepEndMath();
-    await stepInterview();
-    await stepDebrief();
-    finishSession("completed");
   }
 
   /* ---------------- end + export ---------------- */
@@ -1635,10 +2046,19 @@
     }
     showScreen("end");
     const status = $("end-save-status");
+    const row = $("end-fallback-row");
+    if (adminMode && !adminSavesOn) {
+      if (status) {
+        status.className = "save-status";
+        status.textContent = "Demo mode — responses were not saved to Drive. Turn on “Save to Drive” if you need a copy.";
+      }
+      if (row) row.hidden = true;
+      Promise.resolve(autosave("complete"));
+      return;
+    }
     if (status) { status.className = "save-status"; status.textContent = "Saving your responses…"; }
     // Final Drive/local save: reason "complete" with completedAt, endReason, and summaries populated.
     Promise.resolve(autosave("complete")).then((res) => {
-      const row = $("end-fallback-row");
       if (res && res.ok) {
         if (status) {
           status.className = "save-status ok";
@@ -1674,7 +2094,7 @@
     "seed", "conditionOrder", "condition", "block", "blockPos", "trainingId", "destination", "renderId",
     "intendedRenderId", "stimulusPlaceholder", "boardId", "boardFile", "layout", "cellId", "congruence",
     "targetRow", "scene_onset_perf", "pitch_at_response",
-    "conditionName", "conditionPosition", "blockOrder", "cueType", "legacySceneId", "panoRes",
+    "conditionName", "conditionPosition", "blockOrder", "cueType", "legacySceneId", "panoRes", "transStyle",
   ];
   const Q_HEADERS = ["participantId", "seed", "conditionOrder", "phase", "administration", "condition", "conditionName",
     "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "otherText", "nChanges",
@@ -1770,7 +2190,9 @@
         return;
       }
     }
-    $("header-meta").textContent = `v4.5 · mode: ${mode} · ${CONFIG.RES}`;
+    initAdminBar();
+    $("header-meta").textContent = "v4.6 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+      " · " + currentTransStyle() + " · " + CONFIG.RES;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
     document.addEventListener("visibilitychange", () => {
@@ -1816,11 +2238,14 @@
         preloaded: () => preloadPromise, BOARDS, NATURE_RENDERS, ABSTRACT_RENDERS, ensureViewer, panoUrl, boardUrl,
         autofill: () => window.WFSurvey.autofill(pageHost()), dismissIntro, get serverOk() { return serverOk; },
         get lastSave() { return lastSave; }, conditionPerformance, overallPerformance, ensureSummaries, stressRows, summaryRows, collectSummaries,
-        playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent };
+        playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent,
+        uid, randomToken, randomIdPart, orderBit, idHashBit, parseTransStyle, currentTransStyle, setLiveTransStyle,
+        get adminMode() { return adminMode; }, requestJump, requestSkip };
     }
-    console.log("[wayfinding v4.4] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.6] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
-      showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS });
+      showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
+      transStyle: currentTransStyle(), adminMode: adminMode });
     runSession().catch((err) => { console.error("[session]", err); logEvent("session_error", { message: String(err && err.message) }); });
   }
 

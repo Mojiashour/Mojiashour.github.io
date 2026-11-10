@@ -19,6 +19,11 @@
  */
 (function () {
   "use strict";
+  let activeSkip = null;
+  function requestSkip() {
+    if (typeof activeSkip === "function") { activeSkip(); return true; }
+    return false;
+  }
 
   const WORDING_VERSION = "DRAFT_IRB_2026-11-09_v43";
 
@@ -319,6 +324,7 @@
       const finish = (skipped) => {
         if (done) return;
         done = true;
+        activeSkip = null;
         cancelAnimationFrame(raf);
         document.removeEventListener("keydown", onKey);
         const duration_ms = Math.round(performance.now() - t0);
@@ -326,6 +332,7 @@
         resolve({ config: C, variant: C.variant, skipped: !!skipped, duration_ms, wordingVersion: C.wordingVersion });
       };
       const onKey = (e) => { if (e.key === "Escape") finish(true); };
+      activeSkip = () => finish(true);
       document.addEventListener("keydown", onKey);
       onEvent && onEvent("prep_onset", { variant: C.variant, duration_s: C.DURATION_S, wordingVersion: C.wordingVersion });
       if (C.DURATION_S <= 0) { finish(false); return; }
@@ -361,12 +368,14 @@
 
       const finish = () => {
         if (done) return; done = true;
+        activeSkip = null;
         clearTimeout(timer); cancelAnimationFrame(raf);
         onEvent && onEvent("stress_task_end", { nCorrect, nWrong, nTimeout, nRestarts });
         resolve({ config: C, responses, summary: { n_responses: responses.length, n_correct: nCorrect, n_wrong: nWrong,
           n_timeout: nTimeout, n_restarts: nRestarts, lowest_number_reached: best, final_limit_ms: Math.round(limit),
           duration_ms: Math.round(performance.now() - t0) } });
       };
+      activeSkip = () => finish();
       const tick = () => {
         const now = performance.now();
         const left = Math.max(0, C.DURATION_S * 1000 - (now - t0));
@@ -445,12 +454,14 @@
 
       const finish = () => {
         if (done) return; done = true;
+        activeSkip = null;
         cancelAnimationFrame(raf);
         onEvent && onEvent("end_math_end", { nCorrect, nWrong, n_responses: responses.length });
         resolve({ config: C, responses, summary: { n_responses: responses.length, n_correct: nCorrect, n_wrong: nWrong,
           n_timeout: 0, n_restarts: 0, lowest_number_reached: best,
           duration_ms: Math.round(performance.now() - t0) } });
       };
+      activeSkip = () => finish();
       const tick = () => {
         const now = performance.now();
         const left = Math.max(0, C.DURATION_S * 1000 - (now - t0));
@@ -618,6 +629,7 @@
       const finish = (skipped, reason) => {
         if (done) return;
         done = true;
+        activeSkip = null;
         clearTimeout(timer);
         cancelAnimationFrame(raf);
         document.removeEventListener("keydown", onKey, true);
@@ -839,6 +851,7 @@
       });
 
       document.addEventListener("keydown", onKey, true);
+      activeSkip = () => finish(true, "skipped");
       onEvent && onEvent("mist_onset", {
         phase: phase, variant: variant, duration_s: durationS,
         average_marker_pct: isPractice ? "" : avgPct,
@@ -855,7 +868,7 @@
   }
 
   window.WFStress = {
-    run: run, runPrep: runPrep, runQuiet: runQuiet, runMist: runMist,
+    run: run, runPrep: runPrep, runQuiet: runQuiet, runMist: runMist, skipCurrent: requestSkip,
     generateProblem: generateProblem, WORDING_VERSION: WORDING_VERSION,
     PREP_COPY: PREP_COPY, MIST_DEFAULTS: MIST_DEFAULTS, MIST_COPY: MIST_COPY,
     DEBRIEF_COPY: DEBRIEF_COPY,

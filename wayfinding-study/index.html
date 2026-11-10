@@ -4,7 +4,7 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v4.5</title>
+  <title>Wayfinding Study v4.6</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -12,6 +12,34 @@
 </head>
 <body>
   <div id="lab-banner" role="status">LAB MODE — markers stub</div>
+  <div id="admin-bar" hidden>
+    <span class="admin-pill">DEMO</span>
+    <label class="admin-field">Transition
+      <select id="admin-trans" aria-label="Transition style">
+        <option value="A">A · fade</option>
+        <option value="A+">A+ · fade + progress</option>
+        <option value="B">B · dash</option>
+        <option value="C">C · cut</option>
+        <option value="W">W · walk</option>
+      </select>
+    </label>
+    <label class="admin-field admin-check"><input type="checkbox" id="admin-saves"> Save to Drive</label>
+    <label class="admin-field">Jump to
+      <select id="admin-jump" aria-label="Jump to phase">
+        <option value="">Jump to…</option>
+        <option value="practice">Practice</option>
+        <option value="mist">MIST</option>
+        <option value="condition1">Condition 1</option>
+        <option value="post_condition">Post-condition</option>
+        <option value="condition2">Condition 2</option>
+        <option value="exit">Exit</option>
+        <option value="results">Results</option>
+      </select>
+    </label>
+    <button type="button" id="admin-skip">Skip</button>
+    <button type="button" id="admin-skip-block">Skip block</button>
+    <button type="button" id="admin-skip-cond">Skip to end of condition</button>
+  </div>
   <div id="file-protocol-warn" class="protocol-warn" hidden role="alert">
     This page was opened as a local file (<code>file://</code>). Panoramas will not load.
     Run <code>python3 tools/server.py</code> in the wayfinding-spa folder and open
@@ -20,7 +48,7 @@
 
   <header class="app-bar">
     <div class="study-wordmark">Moji Ashour</div>
-    <h1>Hospital Wayfinding · v4.5</h1>
+    <h1>Hospital Wayfinding · v4.6</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
 
@@ -51,6 +79,7 @@
       <p class="hint protocol-warn" id="preload-status" hidden></p>
       <div class="btn-row">
         <button type="button" id="btn-to-practice" disabled>Loading…</button>
+        <button type="button" class="secondary" id="btn-skip-instructions" hidden>Skip</button>
       </div>
     </section>
 
@@ -72,6 +101,8 @@
             <div id="pano"></div>
             <div id="loading-overlay" class="loading-overlay">Loading scene…</div>
             <div id="transition-overlay" aria-hidden="true"></div>
+            <div id="vignette-overlay" aria-hidden="true"></div>
+            <div id="intersection-label" class="intersection-label" hidden></div>
             <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
               <span id="placeholder-text" class="placeholder-text">Recall probe</span>
               <span id="placeholder-sub" class="placeholder-sub"></span>

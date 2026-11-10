@@ -60,6 +60,7 @@
   (function () {
     // Client-side gate only (not a security boundary). Compare SHA-256, never the plaintext.
     var EXPECT = "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab";
+    var EXPECT_ADMIN = "835d6dc88b708bc646d6db82c853ef4182fabbd4a8de59c213f2b5ab3ae7d9be";
     var input = document.getElementById("study-pw");
     var err = document.getElementById("study-err");
     var btn = document.getElementById("study-start");
@@ -78,12 +79,17 @@
       if (!pw) { err.textContent = "Please enter the access code."; return; }
       btn.disabled = true;
       sha256(pw).then(function (h) {
-        if (h !== EXPECT) {
+        var isAdmin = (h === EXPECT_ADMIN);
+        if (!isAdmin && h !== EXPECT) {
           err.textContent = "That code does not match. Please try again.";
           btn.disabled = false;
           return;
         }
-        try { sessionStorage.setItem("wf_gate_ok", "1"); } catch (e) {}
+        try {
+          sessionStorage.setItem("wf_gate_ok", "1");
+          if (isAdmin) sessionStorage.setItem("wf_admin", "1");
+          else sessionStorage.removeItem("wf_admin");
+        } catch (e) {}
         location.href = "/wayfinding-study/?mode=remote";
       }).catch(function () {
         err.textContent = "Could not verify the code in this browser. Please try Chrome.";
