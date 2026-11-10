@@ -1,4 +1,5 @@
 /**
+ * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
  * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
  * Wayfinding SPA v4.5 — visual restyle to match moji-ashour.com; task logic unchanged from v4.4.
  * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
@@ -107,6 +108,9 @@
     TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
     // v4.6 participant default. One constant; ?transStyle= or the admin dropdown can change it.
     DEFAULT_TRANS_STYLE: "A",
+    // WI = walk + dark iris. Exit walk ~1 s; entry iris-open ~450 ms. Total ~1.45 s.
+    WI_OUT_MS: 1000,
+    WI_IN_MS: 450,
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
     WORDING_VERSION: "DRAFT_IRB_2026-11-09_v44",
@@ -191,7 +195,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.6",
+    appVersion: "v4.6.1",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -288,6 +292,7 @@
     B: "B", dash: "B",
     C: "C", cut: "C",
     W: "W", walk: "W",
+    WI: "WI", walkIris: "WI", WALKIRIS: "WI", walkiris: "WI",
   };
   function parseTransStyle(v) {
     const s = String(v == null ? "" : v).trim();
@@ -802,6 +807,7 @@
     setPanoBlur(0);
     setOverlayOpacity(0);
     setVignette(false);
+    hideIris();
     hideIntersectionLabel();
     fadeCovered = false;
     transitionBusy = false;
@@ -838,6 +844,50 @@
   function hideIntersectionLabel() {
     const el = $("intersection-label");
     if (el) { el.hidden = true; el.textContent = ""; }
+  }
+  function irisEl() { return $("iris-overlay"); }
+  /** frac 1 = fully open (clear), 0 = fully closed (near-black). */
+  function setIrisOpen(frac) {
+    const el = irisEl();
+    if (!el) return;
+    const t = Math.max(0, Math.min(1, +frac));
+    const r = el.getBoundingClientRect();
+    const w = r.width || el.clientWidth || 800;
+    const h = r.height || el.clientHeight || 450;
+    const diag = 0.5 * Math.hypot(w, h);
+    const soft = Math.max(28, diag * 0.14);
+    el.classList.toggle("on", t < 0.995);
+    if (t <= 0.001) {
+      // Fully closed: solid near-black, no residual bright hole at the center.
+      el.style.background = "#050505";
+      return;
+    }
+    el.style.background = "";
+    const hole = t * (diag + soft);
+    el.style.setProperty("--iris-hole", hole.toFixed(1) + "px");
+    el.style.setProperty("--iris-soft", (hole + soft).toFixed(1) + "px");
+    el.style.setProperty("--iris-solid", (hole + soft * 1.7).toFixed(1) + "px");
+  }
+  function hideIris() {
+    const el = irisEl();
+    if (!el) return;
+    el.classList.remove("on");
+    el.style.background = "";
+    el.style.removeProperty("--iris-hole");
+    el.style.removeProperty("--iris-soft");
+    el.style.removeProperty("--iris-solid");
+  }
+  function animateIris(from, to, ms, ease) {
+    const fn = ease || ((u) => u);
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const step = (now) => {
+        const u = ms <= 0 ? 1 : Math.min(1, (now - t0) / ms);
+        setIrisOpen(from + (to - from) * fn(u));
+        if (u < 1) requestAnimationFrame(step); else resolve();
+      };
+      requestAnimationFrame(step);
+    });
   }
   function animateOverlay(from, to, ms) {
     return new Promise((resolve) => {
@@ -918,6 +968,32 @@
       } catch (err) { console.error("[transition-b]", err); }
       setOverlayOpacity(1);
       fadeCovered = true;
+    } else if (style === "WI") {
+      // Walk + dark iris: shorter, subtler walk (no blur, no bob) while a near-black iris closes.
+      const outMs = CONFIG.WI_OUT_MS != null ? CONFIG.WI_OUT_MS : 1000;
+      const targetYaw = choice === "left" ? -CONFIG.TRANS_YAW : CONFIG.TRANS_YAW;
+      setPanoBlur(0);
+      setOverlayOpacity(0);
+      setIrisOpen(1);
+      try {
+        if (pano) {
+          await pano.animateTo({
+            yaw: targetYaw, pitch: 0, hfov: CONFIG.TRANS_HFOV,
+            duration: outMs, bobAmp: 0, bobCycles: 0,
+            ease: (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2),
+          }, (u) => {
+            // Linger slightly open, then ease-in close so the walk is readable at first.
+            const iu = Math.max(0, Math.min(1, (u - 0.12) / 0.88));
+            setIrisOpen(1 - iu * iu);
+          });
+        } else {
+          await animateIris(1, 0, outMs, (u) => u * u);
+        }
+      } catch (err) { console.error("[transition-wi]", err); }
+      setIrisOpen(0);
+      setPanoBlur(0);
+      setOverlayOpacity(0);
+      fadeCovered = true;
     } else {
       // W · current v4.4 walking animation
       const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
@@ -968,6 +1044,7 @@
       setPanoBlur(0);
       setOverlayOpacity(0);
       setVignette(false);
+      hideIris();
       hideIntersectionLabel();
       fadeCovered = false;
       transitionBusy = false;
@@ -1003,6 +1080,18 @@
         setPanoBlur(0);
         setOverlayOpacity(1);
         await animateOverlay(1, 0, 150);
+      } else if (style === "WI") {
+        if (pano) {
+          pano.interactive = false;
+          pano.setView(CONFIG.START_YAW, CONFIG.START_PITCH, CONFIG.HFOV);
+        }
+        setPanoBlur(0);
+        setOverlayOpacity(0);
+        setIrisOpen(0);
+        const inMs = CONFIG.WI_IN_MS != null ? CONFIG.WI_IN_MS : 450;
+        await animateIris(0, 1, inMs, (u) => 1 - (1 - u) * (1 - u));
+        setIrisOpen(1);
+        hideIris();
       } else {
         const dur = CONFIG.TRANS_MS > 0 ? CONFIG.TRANS_MS : 2200;
         const outFrac = CONFIG.TRANS_OUT_FRAC == null ? 0.55 : CONFIG.TRANS_OUT_FRAC;
@@ -2191,7 +2280,7 @@
       }
     }
     initAdminBar();
-    $("header-meta").textContent = "v4.6 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v4.6.1 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
@@ -2242,7 +2331,7 @@
         uid, randomToken, randomIdPart, orderBit, idHashBit, parseTransStyle, currentTransStyle, setLiveTransStyle,
         get adminMode() { return adminMode; }, requestJump, requestSkip };
     }
-    console.log("[wayfinding v4.6] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.6.1] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode });

@@ -4,7 +4,7 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v4.6</title>
+  <title>Wayfinding Study v4.6.1</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -21,6 +21,7 @@
         <option value="B">B · dash</option>
         <option value="C">C · cut</option>
         <option value="W">W · walk</option>
+        <option value="WI">WI — walk + dark iris</option>
       </select>
     </label>
     <label class="admin-field admin-check"><input type="checkbox" id="admin-saves"> Save to Drive</label>
@@ -48,7 +49,7 @@
 
   <header class="app-bar">
     <div class="study-wordmark">Moji Ashour</div>
-    <h1>Hospital Wayfinding · v4.6</h1>
+    <h1>Hospital Wayfinding · v4.6.1</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
 
@@ -102,6 +103,7 @@
             <div id="loading-overlay" class="loading-overlay">Loading scene…</div>
             <div id="transition-overlay" aria-hidden="true"></div>
             <div id="vignette-overlay" aria-hidden="true"></div>
+            <div id="iris-overlay" aria-hidden="true"></div>
             <div id="intersection-label" class="intersection-label" hidden></div>
             <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
               <span id="placeholder-text" class="placeholder-text">Recall probe</span>

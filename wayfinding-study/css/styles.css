@@ -1273,6 +1273,21 @@ body.admin:has(#screen-trial.active) #admin-bar, body.admin-mode:has(#screen-tri
 }
 #vignette-overlay.on { opacity: 1; }
 
+#iris-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 23;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(0,0,0,0) 0,
+    rgba(0,0,0,0) var(--iris-hole, 2000px),
+    rgba(8,8,8,.9) var(--iris-soft, 2000px),
+    #050505 var(--iris-solid, 2000px),
+    #000 100%);
+}
+#iris-overlay.on { opacity: 1; }
+
 .intersection-label {
   position: absolute;
   top: 14px;
