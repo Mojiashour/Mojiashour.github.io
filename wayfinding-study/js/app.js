@@ -1,4 +1,5 @@
 /**
+ * Wayfinding SPA v4.5 — visual restyle to match moji-ashour.com; task logic unchanged from v4.4.
  * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
  * a MIST-style stress induction (Dedovic et al., 2005; original HTML/JS, not Inquisit) before each
  * wayfinding condition, Nature + Poster(Abstract) conditions on the FINAL 6000x3000 renders, a short
@@ -1143,6 +1144,19 @@
     return { practice, condQueues, conds };
   }
 
+  function preferDesktop() {
+    const narrow = window.innerWidth < 900;
+    const touchOnly = window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(pointer: fine)").matches;
+    return narrow || touchOnly;
+  }
+  function deviceNoteHtml() {
+    return `<p class="device-note" id="device-note" hidden>Please use a laptop or desktop to take part in this study. The task needs a keyboard and a larger screen. You may still begin if you need to.</p>`;
+  }
+  function revealDeviceNote(host) {
+    const el = (host || document).querySelector("#device-note");
+    if (el && preferDesktop()) el.hidden = false;
+  }
+
   async function stepSetup() {
     setPhase("setup");
     const fileWarn = location.protocol === "file:"
@@ -1151,7 +1165,8 @@
     const urlPid = (params.get("pid") || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
     if (mode === "lab") {
       await page(`
-        <h2>Hospital Wayfinding Study</h2>
+        <p class="kicker">Lab setup</p>
+        <h2>Hospital <em>Wayfinding</em> Study</h2>
         <p class="exp-note">Experimenter setup. Enter a study code if you have one (no names or initials), or leave this blank and the session will assign a unique ID.</p>
         <div class="field"><label for="participant-id">Participant ID (optional)</label>
           <input id="participant-id" type="text" autocomplete="off" maxlength="24" placeholder="assigned automatically if blank" value="${urlPid.replace(/"/g, "")}" /></div>
@@ -1162,10 +1177,13 @@
       return beginSession(typed || urlPid);
     }
     await page(`
-      <h2>Hospital Wayfinding Study</h2>
+      <p class="kicker">Research participation</p>
+      <h2>Hospital <em>Wayfinding</em> Study</h2>
       <p>Click Begin to start.</p>
+      ${deviceNoteHtml()}
       ${fileWarn}`,
-      [{ id: "go", label: "Begin", disabled: location.protocol === "file:" }]);
+      [{ id: "go", label: "Begin", disabled: location.protocol === "file:" }],
+      { onShow: (h) => revealDeviceNote(h) });
     return beginSession(urlPid);
   }
 
@@ -1177,6 +1195,7 @@
       ? " The experimenter will be nearby if you have questions."
       : "";
     await page(`
+      <p class="kicker">Before you begin</p>
       <h2>Welcome</h2>
       <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questionnaires about how you feel and how you find your way.</p>
       <p>The session has several parts:</p>
@@ -1197,7 +1216,8 @@
     setPhase("consent");
     logEvent("consent_shown");
     const btn = await page(`
-      <h2>Information and consent</h2>
+      <p class="kicker">Informed consent</p>
+      <h2>Information and <em>consent</em></h2>
       <div class="irb-placeholder">
         <p><strong>[PLACEHOLDER: IRB protocol number]</strong></p>
         <p><strong>[PLACEHOLDER: study title]</strong></p>
@@ -1750,7 +1770,7 @@
         return;
       }
     }
-    $("header-meta").textContent = `v4.4 · mode: ${mode} · ${CONFIG.RES}`;
+    $("header-meta").textContent = `v4.5 · mode: ${mode} · ${CONFIG.RES}`;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
     document.addEventListener("visibilitychange", () => {

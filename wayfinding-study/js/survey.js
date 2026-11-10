@@ -185,6 +185,7 @@
         const instr = emphasize(esc(inst.instructions), inst.emphasize);
         let html = `<div class="survey" data-instrument="${inst.id}" data-page="${pageI + 1}" data-pages="${pages.length}">
           <div class="survey-head">
+          <p class="kicker">Questionnaire</p>
           <h2>${esc(inst.title)}</h2>
           <p class="survey-instr">${instr}</p></div>`;
 

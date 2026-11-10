@@ -4,7 +4,10 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v4.4</title>
+  <title>Wayfinding Study v4.5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -16,7 +19,8 @@
   </div>
 
   <header class="app-bar">
-    <h1>Hospital Wayfinding · v4.4</h1>
+    <div class="study-wordmark">Moji Ashour</div>
+    <h1>Hospital Wayfinding · v4.5</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
 
@@ -28,6 +32,7 @@
 
     <!-- Instructions -->
     <section id="screen-instructions" class="screen" aria-label="Instructions">
+      <p class="kicker">Wayfinding task</p>
       <h2>Instructions</h2>
       <p class="instr-lead">In this section, you are asked to find a destination inside a hospital environment. Remember that you can:</p>
       <ol class="instr-list">
@@ -110,7 +115,8 @@
     <!-- End: participant results / debrief, plus experimenter tools when in lab or debug -->
     <section id="screen-end" class="screen participant-end" aria-label="Session complete">
       <div id="end-participant">
-        <h2>Session complete</h2>
+        <p class="kicker">Session</p>
+        <h2>Session <em>complete</em></h2>
         <p id="end-thanks">Thank you.</p>
         <div id="end-debrief" class="debrief-block"></div>
         <div id="end-results"></div>

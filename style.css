@@ -336,3 +336,6 @@ body:has(.proj) .navin{grid-template-columns:300px minmax(0,1fr)}
 .lb.zoomed .lbimg img{cursor:zoom-out}.lb.zoomed .lbimg img:active{cursor:grabbing}
 .lb .lbzi,.lb .lbzo{top:16px;width:40px;height:40px;font-size:22px;border:1px solid var(--line);transform:none;z-index:2}
 .lb .lbzi{right:120px}.lb .lbzo{right:72px}
+
+/* header nav: Participate active */
+.menu nav a[aria-current=page]{color:var(--ink);font-weight:600}

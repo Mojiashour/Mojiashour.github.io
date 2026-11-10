@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
   <style>
     /* Study gate page — matches site palette; self-contained extras only */
     .part-main{min-height:100vh;padding:120px 40px 80px}
@@ -35,7 +35,8 @@
   </style>
 </head>
 <body>
-  <header class="nav"><div class="wrap navin"><a class="brand" href="/">Moji Ashour</a></div></header>
+  <header class="nav"><div class="wrap navin"><a class="brand" href="index.html#top">Moji Ashour</a>
+<div class="menu" id="menu"><button class="menubtn" aria-expanded="false" aria-controls="menulinks">Menu</button><nav id="menulinks"><a href="index.html#about">About</a><a href="index.html#research">Research</a><a href="index.html#teaching">Teaching</a><a href="participate.html" aria-current="page">Participate</a></nav></div></div></header>
   <main class="part-main">
     <div class="part-inner">
       <p class="part-kicker">Research participation</p>
@@ -93,6 +94,14 @@
     input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); go(); }
     });
+  })();
+  </script>
+  <script>
+  (function(){var m=document.getElementById('menu');if(!m)return;var b=m.querySelector('.menubtn');
+  b.addEventListener('click',function(){var o=m.classList.toggle('open');b.setAttribute('aria-expanded',o)});
+  document.addEventListener('click',function(e){if(!m.contains(e.target)){m.classList.remove('open');b.setAttribute('aria-expanded',false)}});
+  m.querySelectorAll('nav a').forEach(function(a){a.addEventListener('click',function(){m.classList.remove('open')})});
+  if(location.search.indexOf('menu')>-1)m.classList.add('open');
   })();
   </script>
 </body>
