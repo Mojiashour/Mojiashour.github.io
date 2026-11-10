@@ -66,9 +66,14 @@
   }
 
   let activeSkip = null;
+  let activeAbort = null;
   function skipCurrent() {
     if (typeof activeSkip === "function") { activeSkip(); return true; }
     return false;
+  }
+  function abortCurrent() {
+    if (typeof activeAbort === "function") { activeAbort(); return true; }
+    return skipCurrent();
   }
 
   function run(host, inst, ctx) {
@@ -130,7 +135,20 @@
         host.querySelectorAll("input.num, input.txt").forEach((el) => el.addEventListener("input", () => {
           const v = el.classList.contains("num") ? (el.value === "" ? "" : +el.value) : el.value.trim();
           if (v === "") { delete state[el.name]; return; }
+          const pna = host.querySelector(`input.pna-toggle[data-pna-for="${el.name}"]`);
+          if (pna) pna.checked = false;
           touch(el.name, v, String(v));
+        }));
+        host.querySelectorAll("input.pna-toggle").forEach((el) => el.addEventListener("change", () => {
+          const name = el.dataset.pnaFor, it = itemById[name];
+          const txt = host.querySelector(`input.txt[name="${name}"]`);
+          if (el.checked) {
+            if (txt) { txt.value = ""; txt.disabled = true; }
+            touch(name, "pna", "I prefer not to answer");
+          } else {
+            if (txt) txt.disabled = false;
+            if (state[name]) delete state[name];
+          }
         }));
         host.querySelectorAll(".vas").forEach((box) => {
           const id = box.dataset.vas, track = box.querySelector(".vas-track"), thumb = box.querySelector(".vas-thumb");
@@ -163,7 +181,11 @@
             }
           } else if (it.type === "number" || it.type === "text") {
             const el = host.querySelector(`input[name="${it.id}"]`);
-            if (el) el.value = s.value;
+            if (s.value === "pna" && it.allowPna) {
+              const pna = host.querySelector(`input.pna-toggle[data-pna-for="${it.id}"]`);
+              if (pna) pna.checked = true;
+              if (el) { el.value = ""; el.disabled = true; }
+            } else if (el) el.value = s.value;
           } else if (it.type === "multi") {
             String(s.value).split(";").forEach((v) => {
               const el = host.querySelector(`input[name="${it.id}"][value="${CSS.escape ? CSS.escape(String(v)) : String(v)}"]`);
@@ -227,7 +249,9 @@
             } else if (it.type === "number") {
               html += `<div class="opts"><input type="number" class="num" name="${it.id}" min="${it.min}" max="${it.max}" step="${it.step}" inputmode="decimal"> <span class="unit">${esc(it.unit || "")}</span></div>`;
             } else if (it.type === "text") {
-              html += `<div class="opts"><input type="text" class="txt" name="${it.id}" maxlength="80" autocomplete="off"></div>`;
+              html += `<div class="opts"><input type="text" class="txt" name="${it.id}" maxlength="80" autocomplete="off">` +
+                (it.allowPna ? ` <label class="opt pna-opt"><input type="checkbox" class="pna-toggle" data-pna-for="${it.id}"> <span>I prefer not to answer</span></label>` : "") +
+                `</div>`;
             } else if (it.type === "vas") {
               html += `<p class="vas-prompt">Click on the line to place your rating.</p>
                 <div class="vas untouched" data-vas="${it.id}"><div class="vas-track" role="slider" aria-label="${esc(it.text)}" aria-valuemin="0" aria-valuemax="100"><div class="vas-thumb"></div></div>
@@ -263,6 +287,7 @@
 
       const finish = (extra) => {
         activeSkip = null;
+        activeAbort = null;
         const submit = performance.now(), submitIso = new Date().toISOString();
         const values = {};
         const rows = items.map((it) => {
@@ -283,19 +308,51 @@
             pages_total: pages.length,
           };
         });
-        resolve({ rows, values, presentedOrder, onsetPerf: onset, submitPerf: submit, duration_ms: Math.round(submit - onset), skipped: !!(extra && extra.skipped) });
+        resolve({ rows, values, presentedOrder, onsetPerf: onset, submitPerf: submit, duration_ms: Math.round(submit - onset),
+          skipped: !!(extra && extra.skipped), aborted: !!(extra && extra.aborted),
+          ineligible: !!(extra && extra.ineligible), ineligibleItem: extra && extra.ineligibleItem, ineligibleValue: extra && extra.ineligibleValue });
       };
       activeSkip = () => finish({ skipped: 1 });
+      activeAbort = () => finish({ aborted: 1 });
 
       const onNext = () => {
         const slice = pages[pageI];
-        const missing = slice.filter((it) => it._req && (state[it.id] == null || state[it.id].value === "" || state[it.id].value == null));
         host.querySelectorAll(".q.missing").forEach((q) => q.classList.remove("missing"));
-        if (missing.length && !admin) {
-          missing.forEach((it) => { const q = host.querySelector(`.q[data-item="${it.id}"]`); if (q) q.classList.add("missing"); });
-          host.querySelector(".survey-err").hidden = false;
-          const q0 = host.querySelector(`.q[data-item="${missing[0].id}"]`); if (q0) q0.scrollIntoView({ block: "center" });
-          if (ctx.onEvent) ctx.onEvent("survey_incomplete_submit", { instrument: inst.id, nMissing: missing.length, page: pageI + 1 });
+        const err = host.querySelector(".survey-err");
+        for (const it of slice) {
+          if (it.type !== "number") continue;
+          const raw = state[it.id] && state[it.id].value;
+          if (raw === "" || raw == null) continue;
+          const v = +raw;
+          if (!Number.isFinite(v)) continue;
+          if (!admin && it.ineligibleBelowMin && it.min != null && v < it.min) {
+            if (ctx.onEvent) ctx.onEvent("survey_ineligible", { instrument: inst.id, itemId: it.id, value: v, min: it.min });
+            finish({ ineligible: 1, ineligibleItem: it.id, ineligibleValue: v });
+            return;
+          }
+        }
+        const rangeFail = slice.filter((it) => {
+          if (it.type !== "number") return false;
+          const raw = state[it.id] && state[it.id].value;
+          if (raw === "" || raw == null) return false;
+          const v = +raw;
+          if (!Number.isFinite(v)) return true;
+          if (it.min != null && v < it.min) return true;
+          if (it.max != null && v > it.max) return true;
+          return false;
+        });
+        const missing = slice.filter((it) => it._req && (state[it.id] == null || state[it.id].value === "" || state[it.id].value == null));
+        if ((missing.length || rangeFail.length) && !admin) {
+          missing.concat(rangeFail).forEach((it) => { const q = host.querySelector(`.q[data-item="${it.id}"]`); if (q) q.classList.add("missing"); });
+          if (err) {
+            err.hidden = false;
+            err.textContent = rangeFail.length
+              ? "Please enter a value in the requested range."
+              : "Please answer all questions on this page before continuing.";
+          }
+          const first = (missing[0] || rangeFail[0]);
+          const q0 = first && host.querySelector(`.q[data-item="${first.id}"]`); if (q0) q0.scrollIntoView({ block: "center" });
+          if (ctx.onEvent) ctx.onEvent("survey_incomplete_submit", { instrument: inst.id, nMissing: missing.length, nRange: rangeFail.length, page: pageI + 1 });
           return;
         }
         if (pageI < pages.length - 1) {
@@ -328,5 +385,5 @@
     });
   }
 
-  window.WFSurvey = { run, autofill, paginate, skipCurrent };
+  window.WFSurvey = { run, autofill, paginate, skipCurrent, abortCurrent };
 })();

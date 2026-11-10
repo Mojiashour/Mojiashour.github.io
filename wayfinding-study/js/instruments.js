@@ -150,39 +150,42 @@
 
   // Non-identifying only: no name / DOB / contact fields. Item 4 (occupation/field) is the docx's open-text item;
   // its hint asks participants not to enter names or other identifying details.
+  const PNA = { v: "pna", label: "I prefer not to answer" };
+  const PNA_EX = { v: "pna", label: "I prefer not to answer", exclusive: true };
+
   I.DEMO = {
     id: "DEMO", title: "Demographics and Background", ref: "Developed for this study.",
-    instructions: "Please answer the following questions about yourself. You may skip any question you prefer not to answer.",
-    required: false,
+    instructions: "Please answer each question about yourself. Age is required. For every other question, you may choose “I prefer not to answer.” Please do not enter names or other identifying details.",
+    required: true,
     sections: [{ items: [
-      { id: "DEM_age", text: "What is your age? (years)", type: "number", min: 18, max: 110, step: 1, unit: "years" },
+      { id: "DEM_age", text: "What is your age? (years)", type: "number", min: 18, max: 110, step: 1, unit: "years", ineligibleBelowMin: true },
       { id: "DEM_gender", text: "What is your gender?", type: "choice",
         options: [{ v: "woman", label: "Woman" }, { v: "man", label: "Man" }, { v: "nonbinary", label: "Non-binary" },
-          { v: "self", label: "Prefer to self-describe:", other: true }, { v: "pna", label: "Prefer not to say" }] },
+          { v: "self", label: "Prefer to self-describe:", other: true }, PNA] },
       { id: "DEM_education", text: "What is the highest level of education you have completed?", type: "choice",
         options: [{ v: "hs", label: "High school or less" }, { v: "somecollege", label: "Some college" }, { v: "bachelor", label: "Bachelor's degree" },
-          { v: "master", label: "Master's degree" }, { v: "doctoral", label: "Doctoral or professional degree" }, { v: "pna", label: "Prefer not to say" }] },
-      { id: "DEM_occupation", text: "What is your current occupation or field of study?", type: "text",
+          { v: "master", label: "Master's degree" }, { v: "doctoral", label: "Doctoral or professional degree" }, PNA] },
+      { id: "DEM_occupation", text: "What is your current occupation or field of study?", type: "text", allowPna: true,
         hint: "General field only (e.g., \u201cengineering student\u201d). Please do not enter names or other identifying details." },
       { id: "DEM_race", text: "What is your race/ethnicity? (select all that apply)", type: "multi",
         options: [{ v: "aian", label: "American Indian or Alaska Native" }, { v: "asian", label: "Asian" }, { v: "black", label: "Black or African American" },
           { v: "hispanic", label: "Hispanic or Latino" }, { v: "mena", label: "Middle Eastern or North African" },
           { v: "nhpi", label: "Native Hawaiian or Pacific Islander" }, { v: "white", label: "White" },
-          { v: "self", label: "Prefer to self-describe:", other: true }, { v: "pna", label: "Prefer not to say", exclusive: true }] },
+          { v: "self", label: "Prefer to self-describe:", other: true }, PNA_EX] },
       { id: "DEM_english", text: "Is English your first language?", type: "choice",
-        options: [{ v: "yes", label: "Yes" }, { v: "no", label: "No (if no, please specify):", other: true }] },
+        options: [{ v: "yes", label: "Yes" }, { v: "no", label: "No (if no, please specify):", other: true }, PNA] },
       { id: "DEM_hospfamiliar", text: "How familiar are you with hospital environments?", type: "choice",
-        options: [1, 2, 3, 4, 5].map((v) => ({ v, label: v === 1 ? "1 Not at all familiar" : v === 5 ? "5 Extremely familiar" : String(v) })) },
+        options: [1, 2, 3, 4, 5].map((v) => ({ v, label: v === 1 ? "1 Not at all familiar" : v === 5 ? "5 Extremely familiar" : String(v) })).concat([PNA]) },
       { id: "DEM_hospvisits", text: "How many times have you visited a hospital in the past 12 months?", type: "choice",
-        options: [{ v: "0", label: "0" }, { v: "1-2", label: "1–2" }, { v: "3-5", label: "3–5" }, { v: ">5", label: "More than 5" }] },
+        options: [{ v: "0", label: "0" }, { v: "1-2", label: "1–2" }, { v: "3-5", label: "3–5" }, { v: ">5", label: "More than 5" }, PNA] },
       { id: "DEM_healthcarework", text: "Do you work or have you worked in a healthcare setting?", type: "choice",
-        options: [{ v: "yes", label: "Yes" }, { v: "no", label: "No" }] },
+        options: [{ v: "yes", label: "Yes" }, { v: "no", label: "No" }, PNA] },
       { id: "DEM_videogames", text: "How often do you play video games?", type: "choice",
-        options: scale(["Never", "Less than once a month", "Monthly", "Weekly", "Daily"]) },
+        options: scale(["Never", "Less than once a month", "Monthly", "Weekly", "Daily"]).concat([PNA]) },
       { id: "DEM_vrexp", text: "How much experience do you have with 360° images, virtual reality, or virtual environments?", type: "choice",
-        options: scale(["None", "A little", "Moderate", "A lot"]) },
+        options: scale(["None", "A little", "Moderate", "A lot"]).concat([PNA]) },
       { id: "DEM_nature", text: "How much time do you typically spend in natural environments (parks, forests, gardens) per week?", type: "choice",
-        options: scale(["Less than 1 hour", "1–3 hours", "3–7 hours", "More than 7 hours"]) },
+        options: scale(["Less than 1 hour", "1–3 hours", "3–7 hours", "More than 7 hours"]).concat([PNA]) },
     ] }],
   };
 

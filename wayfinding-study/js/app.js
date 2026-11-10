@@ -1,4 +1,5 @@
 /**
+ * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
  * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
  * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
  * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
@@ -125,7 +126,7 @@
     WI_IN_MS: 450,
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
-    WORDING_VERSION: "DRAFT_IRB_2026-11-09_v47",
+    WORDING_VERSION: "DRAFT_IRB_2026-11-10_v48",
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
       LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
   };
@@ -207,7 +208,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.7",
+    appVersion: "v4.8",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -225,6 +226,8 @@
     config: CONFIG,
     consent: null,
     eligibility: null,
+    excludeFromAnalysis: 0,
+    exclusionRequested: "",
     preload: null,
     plan: null,
     trials: [],
@@ -321,7 +324,11 @@
   let adminMode = false;
   let adminSavesOn = false;
   let pendingJump = null;
+  let pendingWithdraw = false;
+  let withdrawArmed = false;
   let skipConditionFlag = false;
+  const STORAGE_PREFIX = "wf_v48_";
+  const LEGACY_STORAGE_PREFIXES = ["wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
     Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
@@ -337,6 +344,69 @@
     const err = new Error("admin_jump");
     err.adminJump = j;
     throw err;
+  }
+  function throwIfWithdraw() {
+    if (!pendingWithdraw) return;
+    pendingWithdraw = false;
+    const err = new Error("withdraw");
+    err.withdraw = true;
+    throw err;
+  }
+  function throwIfAbort() {
+    throwIfJump();
+    throwIfWithdraw();
+  }
+  function setWithdrawVisible(on) {
+    const el = $("btn-withdraw");
+    if (el) el.hidden = !on;
+  }
+  function shouldShowDebriefOnExit() {
+    if (session.stress && session.stress.debriefShown) return false;
+    if (session.consent && session.consent.decision === "agreed") return true;
+    const dst = session.stress && session.stress.dst;
+    if (dst && ((dst.segments && dst.segments.length) || (dst.anticipation && dst.anticipation.length))) return true;
+    if (session.stress && session.stress.mist && session.stress.mist.segments && session.stress.mist.segments.length) return true;
+    if (session.trials && session.trials.length) return true;
+    return false;
+  }
+  function requestWithdraw() {
+    if (!withdrawArmed || session.completedAt) return;
+    if (pendingWithdraw) return;
+    const ok = window.confirm("Do you want to withdraw from this study? The session will stop, and you will see a short explanation of the study. Any responses already recorded will be marked so they can be excluded from analysis.");
+    if (!ok) {
+      logEvent("withdraw_cancelled", { phase: currentPhase });
+      return;
+    }
+    pendingWithdraw = true;
+    session.excludeFromAnalysis = 1;
+    session.exclusionRequested = session.exclusionRequested || "withdraw";
+    logEvent("withdraw_confirmed", { phase: currentPhase });
+    setWithdrawVisible(false);
+    if (window.WFSurvey && typeof window.WFSurvey.abortCurrent === "function") window.WFSurvey.abortCurrent();
+    else if (window.WFSurvey && typeof window.WFSurvey.skipCurrent === "function") window.WFSurvey.skipCurrent();
+    if (window.WFStress && typeof window.WFStress.skipCurrent === "function") window.WFStress.skipCurrent();
+    skipConditionFlag = true;
+    eventQueue = [];
+    pendingSegments = [];
+    const r = segmentDone; segmentDone = null;
+    if (r) r();
+    adminSignal("withdraw");
+  }
+  function listStudyStorageKeys(store) {
+    const keys = [];
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (!k) continue;
+        if (k.startsWith(STORAGE_PREFIX) || LEGACY_STORAGE_PREFIXES.some((p) => k.startsWith(p))) keys.push(k);
+      }
+    } catch (e) { /* ignore */ }
+    return keys;
+  }
+  function clearStudyStorage() {
+    try {
+      listStudyStorageKeys(localStorage).forEach((k) => localStorage.removeItem(k));
+    } catch (e) { /* ignore */ }
   }
   function applyAdminPrefix() {
     if (!adminMode || !adminSavesOn || !session.participantId) return;
@@ -453,7 +523,7 @@
       return Promise.resolve(lastSave);
     }
     const json = JSON.stringify(session);
-    try { localStorage.setItem("wf_v44_" + session.participantId, json); } catch (e) { /* quota: ignore */ }
+    try { localStorage.setItem(STORAGE_PREFIX + session.participantId, json); } catch (e) { /* quota: ignore */ }
     const meta = {
       appVersion: session.appVersion, startedAt: session.startedAt, completedAt: session.completedAt || "",
       endReason: session.endReason || "", reason, savedAt: isoNow(),
@@ -1373,7 +1443,9 @@
         resolve(id);
       };
       const off = onAdminSignal((kind) => {
-        if (kind === "skip" || kind === "jump") done(kind === "jump" ? "admin-jump" : "admin-skip");
+        if (kind === "jump") done("admin-jump");
+        else if (kind === "skip") done("admin-skip");
+        else if (kind === "withdraw") done("withdraw");
       });
       pageHost().innerHTML = `<div class="page ${o.cls || ""}">${html}<div class="btn-row">` +
         buttons.map((b) => `<button type="button" data-btn="${b.id}" class="${b.cls || ""}" ${b.disabled ? "disabled" : ""}>${escapeHtml(b.label)}</button>`).join("") +
@@ -1396,7 +1468,18 @@
       stepLabel, rnd: surveyRnd, onEvent: (t, x) => logEvent(t, x),
       admin: adminMode,
     });
-    throwIfJump();
+    if (res && res.aborted) throwIfAbort();
+    if (res && res.ineligible) {
+      session.eligibility = Object.assign({}, session.eligibility || {}, {
+        ageConfirmed18: 0, source: "demographics", reportedAge: res.ineligibleValue,
+      });
+      logEvent("eligibility_fail", { reason: "under18", at: "demographics", itemId: res.ineligibleItem, value: res.ineligibleValue });
+      const err = new Error("ineligible_under18");
+      err.sessionEnd = "ineligible_under18";
+      err.ineligibleAt = "demographics";
+      throw err;
+    }
+    throwIfAbort();
     if (!res) return null;
     const ctx = { participantId: session.participantId, seed: session.seed, conditionOrder: session.conditionOrder,
       phase: currentPhase, administration, ...(extra || {}) };
@@ -1496,7 +1579,7 @@
         logEvent("rest_offset", { label, skipped: skipped ? 1 : 0, actual_ms: Math.round(performance.now() - t0) });
         resolve();
       };
-      const onKey = (e) => { if (e.key === "Escape") end(true); };
+      const onKey = (e) => { if (e.key === "Escape" && adminMode) end(true); };
       document.addEventListener("keydown", onKey);
       offAdmin = onAdminSignal((kind) => { if (kind === "skip" || kind === "jump") end(true); });
       tm = setTimeout(() => end(false), dur * 1000);
@@ -1536,6 +1619,8 @@
       startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE,
       showSam: CONFIG.SHOW_SAM ? 1 : 0, showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION });
+    withdrawArmed = true;
+    setWithdrawVisible(true);
     pendingSegments = [practice].concat(condQueues.map((c) => c.queue)); // GPU look-ahead for the first window
     preloadPromise = preloadAll(sessionAssetUrls([practice].concat(condQueues.map((c) => c.queue))));
     preloadPromise.catch((err) => console.error("[preload]", err));
@@ -1614,43 +1699,92 @@
   async function stepConsent() {
     setPhase("consent");
     logEvent("consent_shown");
+    const copy = window.WF_CONSENT_COPY || { version: "MISSING", html: "<p>[Consent text missing.]</p>" };
     const btn = await page(`
       <p class="kicker">Informed consent</p>
       <h2>Information and <em>consent</em></h2>
-      <div class="irb-placeholder">
-        <p><strong>[PLACEHOLDER: IRB protocol number]</strong></p>
-        <p><strong>[PLACEHOLDER: study title]</strong></p>
-        <p><strong>[PLACEHOLDER: principal investigator and contact information]</strong></p>
-        <p><strong>[PLACEHOLDER: IRB-approved consent text: purpose, procedures, duration, risks, benefits, voluntary participation and withdrawal, confidentiality, compensation, contacts]</strong></p>
+      ${copy.html}
+      <div class="age-gate">
+        <label for="age-confirm"><input id="age-confirm" type="checkbox"> <span>I confirm I am 18 years of age or older</span></label>
       </div>
       <div class="field"><label for="consent-date">Date (any format)</label>
-        <input id="consent-date" type="text" autocomplete="off" maxlength="80" placeholder="e.g. 9 November 2026" /></div>
-      <p>If you agree to take part, select <em>I agree</em>. If you do not agree, select <em>I do not agree</em> and the session will end.</p>
-      <p class="survey-err" id="consent-date-err" hidden>Please enter the date before continuing.</p>`,
-      [{ id: "agree", label: "I agree – Continue" }, { id: "decline", label: "I do not agree", cls: "secondary" }],
-      { validate: (id) => {
-        if (id !== "agree") return true;
-        if (adminMode) return true;
-        const v = (($("consent-date") && $("consent-date").value) || "").trim();
-        const err = $("consent-date-err");
-        if (!v) { if (err) err.hidden = false; return false; }
-        if (err) err.hidden = true;
-        return true;
-      } });
+        <input id="consent-date" type="text" autocomplete="off" maxlength="80" placeholder="e.g. 10 November 2026" /></div>
+      <p class="survey-err" id="consent-date-err" hidden>Please confirm that you are 18 or older and enter the date before continuing.</p>`,
+      [
+        { id: "agree", label: "I agree – Continue", disabled: !adminMode },
+        { id: "decline", label: "I do not agree", cls: "secondary" },
+        { id: "under18", label: "I am under 18", cls: "ghost" },
+      ],
+      {
+        cls: "consent-page",
+        onShow: (h) => {
+          const cb = h.querySelector("#age-confirm");
+          const agree = h.querySelector('button[data-btn="agree"]');
+          const err = h.querySelector("#consent-date-err");
+          const sync = () => {
+            if (!agree) return;
+            if (adminMode) { agree.disabled = false; return; }
+            agree.disabled = !(cb && cb.checked);
+          };
+          sync();
+          if (cb) cb.addEventListener("change", () => { if (err) err.hidden = true; sync(); });
+        },
+        validate: (id) => {
+          if (id !== "agree") return true;
+          if (adminMode) return true;
+          const checked = $("age-confirm") && $("age-confirm").checked;
+          const v = (($("consent-date") && $("consent-date").value) || "").trim();
+          const err = $("consent-date-err");
+          if (!checked || !v) {
+            if (err) {
+              err.hidden = false;
+              err.textContent = !checked
+                ? "Please confirm that you are 18 years of age or older before agreeing."
+                : "Please enter the date before continuing.";
+            }
+            return false;
+          }
+          if (err) err.hidden = true;
+          return true;
+        },
+      });
+    if (btn === "withdraw") { throwIfAbort(); return false; }
+    if (btn === "under18") {
+      logEvent("eligibility_fail", { reason: "under18", at: "consent" });
+      const err = new Error("ineligible_under18");
+      err.sessionEnd = "ineligible_under18";
+      err.ineligibleAt = "consent";
+      throw err;
+    }
     if (btn === "admin-skip" || btn === "admin-jump") {
       session.consent = { decision: "agreed", timestamp: isoNow(), perf: +performance.now().toFixed(1),
-        text_version: "PLACEHOLDER (no IRB text yet)", dateEntered: "admin-skip" };
-      logEvent("consent_agreed", { dateEntered: "admin-skip", admin: 1 });
+        text_version: copy.version, dateEntered: "admin-skip", ageConfirmed: "admin-skip" };
+      logEvent("consent_agreed", { dateEntered: "admin-skip", admin: 1, text_version: copy.version });
       autosave("consent");
-      throwIfJump();
+      throwIfAbort();
       return true;
     }
     const dateEntered = (($("consent-date") && $("consent-date").value) || "").trim();
+    const ageConfirmed = !!( $("age-confirm") && $("age-confirm").checked );
     session.consent = { decision: btn === "agree" ? "agreed" : "declined", timestamp: isoNow(), perf: +performance.now().toFixed(1),
-      text_version: "PLACEHOLDER (no IRB text yet)", dateEntered };
-    logEvent(btn === "agree" ? "consent_agreed" : "consent_declined", { dateEntered });
+      text_version: copy.version, dateEntered, ageConfirmed: ageConfirmed ? 1 : 0 };
+    session.eligibility = { ageConfirmed18: (btn === "agree" && ageConfirmed) ? 1 : 0, source: "consent_checkbox" };
+    logEvent(btn === "agree" ? "consent_agreed" : "consent_declined", { dateEntered, text_version: copy.version });
     autosave("consent");
     return btn === "agree";
+  }
+
+  async function showIneligiblePage() {
+    setPhase("ineligible");
+    withdrawArmed = false;
+    setWithdrawVisible(false);
+    await page(`
+      <p class="kicker">Eligibility</p>
+      <h2>Thank you for your <em>interest</em></h2>
+      <p>You need to be 18 years of age or older to take part in this study. No further questions will be asked, and you may close this window.</p>
+      <p>If you reached this page by mistake, you may contact the study team at <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a>.</p>`,
+      [{ id: "ok", label: "Close" }],
+      { cls: "ineligible-page" });
   }
 
   async function stepToday() {
@@ -1700,7 +1834,7 @@
       const off = onAdminSignal((kind) => { if (kind === "skip" || kind === "jump") finish(); });
     });
     logEvent("task_instructions_done");
-    throwIfJump();
+    throwIfAbort();
   }
 
   async function stepLiveStress() {
@@ -1805,17 +1939,17 @@
     const ant = await window.WFStress.runDstAnticipation(pageHost(), dstCfg({ variant: variant }), (t, x) => logEvent(t, x));
     session.stress.dst.anticipation.push(ant);
     autosave(antPhase);
-    throwIfJump();
+    throwIfAbort();
     if (!(ant && ant.reason === "skipped")) {
       setPhase(cdPhase, { variant: variant });
       await window.WFStress.runDstCountdown(pageHost(), dstCfg({ variant: variant }), (t, x) => logEvent(t, x));
-      throwIfJump();
+      throwIfAbort();
     }
     setPhase(mathPhase, { variant: variant, duration_s: CONFIG.DST_S, average_pct: CONFIG.DST_AVG, list_id: listId, limit_ms: CONFIG.DST_LIMIT_MS });
     const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId }), (t, x) => logEvent(t, x));
     session.stress.dst.segments.push(seg);
     autosave(mathPhase);
-    throwIfJump();
+    throwIfAbort();
     if (seg && !seg.skipped) {
       setPhase(sumPhase, { variant: variant, summary: seg.summary });
       const html = window.WFStress.dstSummaryHtml(seg.summary);
@@ -1842,8 +1976,18 @@
   async function stepDebrief() {
     const copy = (window.WFStress && window.WFStress.DEBRIEF_COPY) || { title: "Debriefing", html: "<p>[PLACEHOLDER: IRB-approved debrief text.]</p>" };
     setPhase("debrief");
-    await page(`<h2>${copy.title}</h2>${copy.html}`, [{ id: "go", label: "Continue" }], { cls: "debrief-page" });
-    throwIfJump();
+    const btn = await page(`<h2>${copy.title}</h2>${copy.html}`, [
+      { id: "go", label: "Continue" },
+      { id: "exclude", label: "Exclude my data", cls: "secondary" },
+    ], { cls: "debrief-page" });
+    if (btn === "exclude" || btn === "withdraw") {
+      session.excludeFromAnalysis = 1;
+      session.exclusionRequested = session.exclusionRequested || (btn === "exclude" ? "debrief" : "withdraw");
+      logEvent("data_exclusion_requested", { at: "debrief", via: btn });
+      pendingWithdraw = false;
+    } else {
+      throwIfAbort();
+    }
     session.stress.debriefShown = true;
     logEvent("debrief_shown", { wordingVersion: CONFIG.WORDING_VERSION, stressMode: CONFIG.STRESS_MODE });
     // Await so this checkpoint cannot race/overwrite the final "complete" save on Drive.
@@ -1950,14 +2094,14 @@
     await page(`<h2>Part ${pos} of ${parts}</h2>
       <p>In this part you will find your way to three destinations in the hospital, one after another.
       Before each destination you will see a short instruction.</p>`, [{ id: "go", label: "Continue" }]);
-    throwIfJump();
+    throwIfAbort();
     logEvent("condition_onset", { condition: c.condition, conditionPosition: pos });
     const blocks = splitQueueByBlocks(c.queue);
     for (let bi = 0; bi < blocks.length; bi++) {
       if (skipConditionFlag || pendingJump) break;
       const laterSegs = blocks.slice(bi + 1).concat(later || []);
       await runSegment(blocks[bi], laterSegs);
-      throwIfJump();
+      throwIfAbort();
       if (skipConditionFlag || pendingJump) break;
       const ev0 = blocks[bi][0] || {};
       setPhase(`post_block_${pos === 1 ? "A" : "B"}`, {
@@ -1967,7 +2111,7 @@
         condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: pos,
         block: ev0.block, blockOrder: ev0.blockOrder, destination: ev0.destination || "",
       });
-      throwIfJump();
+      throwIfAbort();
     }
     skipConditionFlag = false;
     // Performance summary is shown once at the end (debrief), not after each condition.
@@ -2013,53 +2157,53 @@
     let cursor = "setup";
     while (cursor) {
       try {
-        throwIfJump();
+        throwIfAbort();
         if (cursor === "setup") {
           s = await stepSetup();
-          throwIfJump();
+          throwIfAbort();
           cursor = "intro";
         } else if (cursor === "intro") {
           await stepIntro();
-          throwIfJump();
+          throwIfAbort();
           cursor = "consent";
         } else if (cursor === "consent") {
           s = s || ensureSessionStarted(s);
           if (!(await stepConsent())) return finishSession("consent_declined");
-          throwIfJump();
+          throwIfAbort();
           cursor = "today";
         } else if (cursor === "today") {
           await stepToday();
-          throwIfJump();
+          throwIfAbort();
           cursor = "baseline";
         } else if (cursor === "baseline") {
           setPhase("baseline");
           await surveySet(["VAS", "SAM", "STICSA_S", "STICSA_T"], "baseline");
-          throwIfJump();
+          throwIfAbort();
           if (mode === "lab") {
             await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
-            throwIfJump();
+            throwIfAbort();
             setPhase("rest_baseline"); await restScreen("baseline", CONFIG.REST_BASELINE_S);
-            throwIfJump();
+            throwIfAbort();
           }
           cursor = "instructions";
         } else if (cursor === "instructions") {
           await stepTaskInstructions();
-          throwIfJump();
+          throwIfAbort();
           cursor = "practice";
         } else if (cursor === "practice") {
           s = s || ensureSessionStarted(s);
           if (preloadPromise) { try { await preloadPromise; } catch (e) { console.error("[preload]", e); } }
           setPhase("practice");
           await runSegment(s.practice, s.condQueues.map((c) => c.queue));
-          throwIfJump();
+          throwIfAbort();
           cursor = "mist";
         } else if (cursor === "mist") {
           s = s || ensureSessionStarted(s);
           await stepInduction("first");
-          throwIfJump();
+          throwIfAbort();
           setPhase("post_mist_1");
           await surveySet(["VAS"], "post_mist_1");
-          throwIfJump();
+          throwIfAbort();
           cursor = "condition1";
         } else if (cursor === "condition1") {
           s = s || ensureSessionStarted(s);
@@ -2067,7 +2211,7 @@
           const nParts = s.condQueues.length;
           const c = s.condQueues[0];
           await stepCondition(c, 1, s.condQueues.slice(1).map((x) => x.queue), nParts);
-          throwIfJump();
+          throwIfAbort();
           cursor = "post_condition";
         } else if (cursor === "post_condition") {
           s = s || ensureSessionStarted(s);
@@ -2075,15 +2219,15 @@
           setPhase("post_condition_A", { condition: c.condition });
           await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_A",
             { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 1 });
-          throwIfJump();
+          throwIfAbort();
           if (s.condQueues.length > 1) {
             if (CONFIG.REST_BETWEEN_S) { setPhase("rest_between"); await restScreen("between_conditions", CONFIG.REST_BETWEEN_S); }
-            throwIfJump();
+            throwIfAbort();
             await stepInduction("second");
-            throwIfJump();
+            throwIfAbort();
             setPhase("post_mist_2");
             await surveySet(["VAS"], "post_mist_2");
-            throwIfJump();
+            throwIfAbort();
           }
           cursor = "condition2";
         } else if (cursor === "condition2") {
@@ -2092,27 +2236,27 @@
           if (s.condQueues.length > 1) {
             const c = s.condQueues[1];
             await stepCondition(c, 2, [], nParts);
-            throwIfJump();
+            throwIfAbort();
             setPhase("post_condition_B", { condition: c.condition });
             await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_B",
               { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 2 });
-            throwIfJump();
+            throwIfAbort();
           }
           cursor = "exit";
         } else if (cursor === "exit") {
           s = s || ensureSessionStarted(s);
           setPhase("post_experiment");
           await surveySet(["SBSOD", "SAS", "EHI", "DEMO"], "post_experiment");
-          throwIfJump();
+          throwIfAbort();
           // MRT: UNDECIDED (CONFIG.MRT = "pending"). Disabled module slot; no MRT items are included in v4.
           if (CONFIG.MRT !== "pending") logEvent("mrt_slot", { status: CONFIG.MRT });
           else logEvent("mrt_slot", { status: "pending_disabled" });
           await stepEndMath();
-          throwIfJump();
+          throwIfAbort();
           await stepInterview();
-          throwIfJump();
+          throwIfAbort();
           await stepDebrief();
-          throwIfJump();
+          throwIfAbort();
           cursor = "results";
         } else if (cursor === "results") {
           finishSession((session.stress && session.stress.debriefShown) ? "completed" : "admin_jump");
@@ -2121,6 +2265,32 @@
           cursor = null;
         }
       } catch (e) {
+        if (e && e.withdraw) {
+          pendingWithdraw = false;
+          skipConditionFlag = false;
+          withdrawArmed = false;
+          setWithdrawVisible(false);
+          session.excludeFromAnalysis = 1;
+          if (shouldShowDebriefOnExit()) {
+            try { await stepDebrief(); } catch (de) { console.error("[debrief]", de); }
+          }
+          finishSession("withdrawn");
+          cursor = null;
+          continue;
+        }
+        if (e && e.sessionEnd === "ineligible_under18") {
+          skipConditionFlag = false;
+          withdrawArmed = false;
+          setWithdrawVisible(false);
+          session.excludeFromAnalysis = 1;
+          await showIneligiblePage();
+          if (e.ineligibleAt === "demographics" && shouldShowDebriefOnExit()) {
+            try { await stepDebrief(); } catch (de) { console.error("[debrief]", de); }
+          }
+          finishSession("ineligible_under18");
+          cursor = null;
+          continue;
+        }
         if (!e || !e.adminJump) throw e;
         const j = e.adminJump;
         pendingJump = null;
@@ -2147,17 +2317,25 @@
 
   function finishSession(reason) {
     setPhase("end");
+    withdrawArmed = false;
+    setWithdrawVisible(false);
     session.completedAt = isoNow();
     session.endReason = reason;
-    logEvent("session_end", { reason });
+    if (reason === "withdrawn" || reason === "ineligible_under18") session.excludeFromAnalysis = 1;
+    logEvent("session_end", { reason, excludeFromAnalysis: session.excludeFromAnalysis ? 1 : 0 });
     const decisions = session.trials.filter((t) => t.trialType === "decision" && !t.isPractice);
     const probes = session.trials.filter((t) => t.trialType === "recall_probe");
     const nAcc = decisions.filter((t) => t.accuracy === 1).length;
     const meanRt = decisions.length ? Math.round(decisions.reduce((s, t) => s + t.rt_ms, 0) / decisions.length) : 0;
     const nProbeAcc = probes.filter((t) => t.accuracy === 1).length;
     const thanks = reason === "completed" ? "Thank you, the session is complete." :
-      reason === "consent_declined" ? "You chose not to take part. Thank you for your time." : "Thank you. The session has ended.";
+      reason === "consent_declined" ? "You chose not to take part. Thank you for your time." :
+      reason === "withdrawn" ? "You have withdrawn from the study. Thank you for your time." :
+      reason === "ineligible_under18" ? "You need to be 18 or older to take part. Thank you for your interest." :
+      "Thank you. The session has ended.";
     $("end-thanks").textContent = thanks;
+    const endH2 = document.querySelector("#end-participant h2");
+    if (endH2) endH2.innerHTML = reason === "completed" ? "Session <em>complete</em>" : "Session <em>ended</em>";
 
     const debrief = $("end-debrief");
     const results = $("end-results");
@@ -2207,6 +2385,7 @@
     if (status) { status.className = "save-status"; status.textContent = "Saving your responses…"; }
     // Final Drive/local save: reason "complete" with completedAt, endReason, and summaries populated.
     Promise.resolve(autosave("complete")).then((res) => {
+      const confirmed = !!(res && res.ok && !res.unconfirmed);
       if (res && res.ok) {
         if (status) {
           status.className = "save-status ok";
@@ -2215,6 +2394,7 @@
             : "Your responses were saved. You may close this window.";
         }
         if (row) row.hidden = true;
+        if (confirmed) clearStudyStorage();
       } else {
         if (status) {
           status.className = "save-status failed";
@@ -2298,7 +2478,7 @@
   }
   function exportFiles() {
     const pid = session.participantId || "unknown";
-    const pre = `wayfinding_v47_${pid}_`;
+    const pre = `wayfinding_v48_${pid}_`;
     return {
       [pre + "session.json"]: JSON.stringify(session, null, 2),
       [pre + "trials.csv"]: sessionToCsv(session),
@@ -2342,7 +2522,8 @@
       }
     }
     initAdminBar();
-    $("header-meta").textContent = "v4.7 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
+    $("header-meta").textContent = "v4.8 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES;
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
@@ -2376,7 +2557,7 @@
     if ($("btn-restart")) $("btn-restart").addEventListener("click", () => location.reload());
     if ($("btn-fallback-download")) $("btn-fallback-download").addEventListener("click", () => {
       const files = exportFiles();
-      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v44_" + (session.participantId || "data") + "_session.json");
+      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v48_" + (session.participantId || "data") + "_session.json");
       downloadBlob(name, files[name] || JSON.stringify(session, null, 2), "application/json");
     });
     document.addEventListener("keydown", onKeyDown);
@@ -2391,9 +2572,9 @@
         get lastSave() { return lastSave; }, conditionPerformance, overallPerformance, ensureSummaries, stressRows, summaryRows, collectSummaries,
         playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent,
         uid, randomToken, randomIdPart, orderBit, idHashBit, parseTransStyle, currentTransStyle, setLiveTransStyle,
-        get adminMode() { return adminMode; }, requestJump, requestSkip };
+        get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw };
     }
-    console.log("[wayfinding v4.7] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.8] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode });

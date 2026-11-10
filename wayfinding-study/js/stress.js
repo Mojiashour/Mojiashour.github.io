@@ -1,5 +1,5 @@
 /**
- * v4.7 stress-induction modules.
+ * v4.8 stress-induction modules (Escape skips admin-only).
  *
  * Default: a DST-style timed math block adapted from Norden et al. (2022),
  * J Med Internet Res 24(7):e32280, with a fixed problem list and a fixed
@@ -25,7 +25,7 @@
     return false;
   }
 
-  const WORDING_VERSION = "DRAFT_IRB_2026-11-09_v47";
+  const WORDING_VERSION = "DRAFT_IRB_2026-11-10_v48";
 
   const PREP_COPY = {
     first: {
@@ -101,14 +101,22 @@
   const DEBRIEF_COPY = {
     title: "Debriefing",
     html: `
-      <p class="draft-banner"><strong>DRAFT for IRB review — not final consent/debrief language.</strong></p>
-      <p>During the timed arithmetic task, a bar compared your accuracy with an “average” of other participants.</p>
+      <p class="draft-banner"><strong>DRAFT for IRB review</strong> — this is not final, IRB-approved debrief language. Contact details for the faculty advisor are placeholders.</p>
+      <p>During the timed arithmetic checks, a bar compared your accuracy with an “average” of other participants.</p>
       <p>That average was <strong>not</strong> a real average of other participants. It was a fixed reference value (75%) used to create mild evaluative pressure. The problems were designed to be difficult in the time allowed. Performance on this task is not a measure of your ability.</p>
-      <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. If you have questions or would like to talk about how you felt during the task, please contact the study team.</p>
-      <p><strong>[PLACEHOLDER: additional IRB-approved debrief text, including who to contact and any further clarification the IRB requires.]</strong></p>`,
+      <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. Some details of the procedures were not fully described at the start of the session so that the experience would be closer to ordinary time pressure. We are sorry for any discomfort this may have caused.</p>
+      <p>If you have questions or would like to talk about how you felt during the task, please contact Mojtaba Ashour, student researcher, at <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a>, or Saleh Kalantari, Ph.D., faculty advisor, at [PLACEHOLDER: email and phone]. You may also contact the Cornell Institutional Review Board for Human Participant Research at <a href="mailto:irbhp@cornell.edu">irbhp@cornell.edu</a> or 607-255-5138.</p>
+      <p>If you would prefer that your responses not be included in the analysis, you may select <strong>Exclude my data</strong> below. Because the study does not collect your name, later requests to remove data may not be possible unless you have kept your study ID.</p>
+      <p><strong>[PLACEHOLDER: any further clarification the IRB requires.]</strong></p>`,
   };
 
   /* ---------------- utilities ---------------- */
+  function isAdminMode() {
+    return document.body.classList.contains("admin") || document.body.classList.contains("admin-mode");
+  }
+  function isAdminEscape(e) {
+    return e && e.key === "Escape" && isAdminMode();
+  }
   function fmtClock(ms) {
     const s = Math.max(0, Math.ceil(ms / 1000));
     return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
@@ -331,7 +339,7 @@
         onEvent && onEvent("prep_offset", { variant: C.variant, skipped: skipped ? 1 : 0, duration_ms });
         resolve({ config: C, variant: C.variant, skipped: !!skipped, duration_ms, wordingVersion: C.wordingVersion });
       };
-      const onKey = (e) => { if (e.key === "Escape") finish(true); };
+      const onKey = (e) => { if (isAdminEscape(e)) finish(true); };
       activeSkip = () => finish(true);
       document.addEventListener("keydown", onKey);
       onEvent && onEvent("prep_onset", { variant: C.variant, duration_s: C.DURATION_S, wordingVersion: C.wordingVersion });
@@ -830,7 +838,7 @@
 
       const onKey = (e) => {
         if (done) return;
-        if (e.key === "Escape") {
+        if (isAdminEscape(e)) {
           e.preventDefault();
           finish(true, "skipped");
           return;
@@ -1139,7 +1147,7 @@
       };
 
       const onKey = (e) => {
-        if (e.key === "Escape") { e.preventDefault(); finish("skipped"); }
+        if (isAdminEscape(e)) { e.preventDefault(); finish("skipped"); }
       };
 
       const tick = (now) => {
@@ -1188,7 +1196,7 @@
         onEvent && onEvent("dst_countdown_end", { reason: reason, duration_ms: Math.round(performance.now() - t0) });
         resolve({ reason: reason, duration_ms: Math.round(performance.now() - t0) });
       };
-      const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); finish("skipped"); } };
+      const onKey = (e) => { if (isAdminEscape(e)) { e.preventDefault(); finish("skipped"); } };
       document.addEventListener("keydown", onKey, true);
       activeSkip = () => finish("skipped");
       onEvent && onEvent("dst_countdown_start", { seconds: total });
@@ -1473,7 +1481,7 @@
 
       const onKey = (e) => {
         if (done) return;
-        if (e.key === "Escape") { e.preventDefault(); finish(true, "skipped"); return; }
+        if (isAdminEscape(e)) { e.preventDefault(); finish(true, "skipped"); return; }
         if (locked) return;
         if (e.key >= "0" && e.key <= "9") {
           e.preventDefault();
