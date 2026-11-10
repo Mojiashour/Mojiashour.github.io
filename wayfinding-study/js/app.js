@@ -1,4 +1,5 @@
 /**
+ * Wayfinding SPA v4.9 — per-intersection decision time limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
  * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
  * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
  * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
@@ -28,6 +29,10 @@
  *   ?mistPracticeSec=40       untimed MIST practice when ?legacyMist=1 (default 40; 0 skips practice)
  *   ?mistAvg=85               MIST average marker when ?legacyMist=1 (clamped 80–90)
  *   ?mistMsg=1                brief negative-evaluative messages in the legacy MIST block (default off)
+ *   ?decisionLimit=5000       per-intersection decision time limit in ms (default 5000; 0 = off). Starts when the
+ *                             decision clock starts (scene fully visible + DECISION_DELAY_MS), never during a transition.
+ *   ?decisionLimitPractice=0  do not apply the decision limit during practice (default: applied, so people learn it)
+ *   ?decisionTimeoutFeedbackMs=700  duration of the “Too slow” message after a timeout (default 700)
  *   ?trans=2200               total exit+entry corridor transition in ms (default 2200 walking pace; 0 disables)
  *   ?fov=102                  horizontal field of view in degrees (default 102; was 90 in v4.3)
  *   ?prep=1                   use the legacy anticipatory-prep screen instead of the DST
@@ -126,7 +131,11 @@
     WI_IN_MS: 450,
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
-    WORDING_VERSION: "DRAFT_IRB_2026-11-10_v48",
+    WORDING_VERSION: "DRAFT_IRB_2026-11-10_v49",
+    // v4.9: per-intersection decision limit. 0 disables. Applied in practice by default (easy to turn off).
+    DECISION_LIMIT_MS: num("decisionLimit", 5000),
+    DECISION_LIMIT_IN_PRACTICE: params.get("decisionLimitPractice") !== "0",
+    DECISION_TIMEOUT_FEEDBACK_MS: Math.max(0, num("decisionTimeoutFeedbackMs", 700)),
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
       LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
   };
@@ -208,7 +217,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.8",
+    appVersion: "v4.9",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -321,14 +330,32 @@
     return liveTransStyle;
   }
 
+  let liveDecisionLimitMs = Math.max(0, CONFIG.DECISION_LIMIT_MS);
+  function currentDecisionLimitMs() { return liveDecisionLimitMs; }
+  function setLiveDecisionLimitMs(v) {
+    const n = +v;
+    liveDecisionLimitMs = Number.isFinite(n) && n > 0 ? n : 0;
+    return liveDecisionLimitMs;
+  }
+
+  let decisionLimitTimer = null;
+  let decisionLimitRaf = null;
+  let decisionLimitDeadline = null;
+  let decisionLimitRemainingMs = 0;
+  let decisionLimitTotalMs = 0;
+  let decisionLimitPaused = false;
+  let decisionLimitSpec = null;
+  let decisionLimitHiddenMs = 0;
+  let decisionLimitPauseStarted = null;
+
   let adminMode = false;
   let adminSavesOn = false;
   let pendingJump = null;
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v48_";
-  const LEGACY_STORAGE_PREFIXES = ["wf_v44_"];
+  const STORAGE_PREFIX = "wf_v49_";
+  const LEGACY_STORAGE_PREFIXES = ["wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
     Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
@@ -388,6 +415,9 @@
     skipConditionFlag = true;
     eventQueue = [];
     pendingSegments = [];
+    currentEvent = null;
+    clearDecisionLimit();
+    hideTooSlow();
     const r = segmentDone; segmentDone = null;
     if (r) r();
     adminSignal("withdraw");
@@ -429,6 +459,9 @@
     if (window.WFStress && typeof window.WFStress.skipCurrent === "function") window.WFStress.skipCurrent();
     eventQueue = [];
     pendingSegments = [];
+    currentEvent = null;
+    clearDecisionLimit();
+    hideTooSlow();
     const r = segmentDone; segmentDone = null;
     if (r) r();
     adminSignal("jump");
@@ -438,6 +471,8 @@
     eventQueue = [];
     choiceEnabled = false;
     currentEvent = null;
+    clearDecisionLimit();
+    hideTooSlow();
     clearTransitionVisuals();
     const r = segmentDone; segmentDone = null;
     if (r) r();
@@ -490,6 +525,23 @@
     if ($("admin-skip")) $("admin-skip").addEventListener("click", requestSkip);
     if ($("admin-skip-block")) $("admin-skip-block").addEventListener("click", requestSkipBlock);
     if ($("admin-skip-cond")) $("admin-skip-cond").addEventListener("click", requestSkipCondition);
+    const dlim = $("admin-decision-limit");
+    if (dlim) {
+      const cur = String(liveDecisionLimitMs);
+      if (![].some.call(dlim.options, (o) => o.value === cur)) {
+        const opt = document.createElement("option");
+        opt.value = cur;
+        opt.textContent = liveDecisionLimitMs ? (liveDecisionLimitMs + " ms") : "Off";
+        dlim.appendChild(opt);
+      }
+      dlim.value = cur;
+      dlim.addEventListener("change", () => {
+        const v = setLiveDecisionLimitMs(dlim.value);
+        dlim.value = String(v);
+        logEvent("admin_decision_limit", { decisionLimitMs: v });
+        updateInstructionLimitCopy();
+      });
+    }
   }
   function ensureSessionStarted(s) {
     if (s && session.participantId) return s;
@@ -782,6 +834,8 @@
     choiceEnabled = false;
     responding = false;
     decisionOnsetPerf = null;
+    clearDecisionLimit();
+    hideTooSlow();
     ["btn-left", "btn-right", "btn-probe-left", "btn-probe-right"].forEach((id) => ($(id).disabled = true));
     setDecisionUI(false);
     setProbeUI(false);
@@ -812,10 +866,171 @@
   }
 
   /* ---------------- events ---------------- */
+  function decisionLimitLabel(ms) {
+    const n = ms == null ? liveDecisionLimitMs : ms;
+    if (!n) return "";
+    const s = n / 1000;
+    const txt = Number.isInteger(s) ? String(s) : String(Math.round(s * 10) / 10);
+    return txt + (s === 1 ? " second" : " seconds");
+  }
+  function decisionLimitApplies(spec) {
+    if (!spec || spec.kind !== "decision") return false;
+    if (!liveDecisionLimitMs || liveDecisionLimitMs <= 0) return false;
+    if (spec.isPractice && !CONFIG.DECISION_LIMIT_IN_PRACTICE) return false;
+    return true;
+  }
+  function activeDecisionLimitMs(spec) {
+    return decisionLimitApplies(spec) ? liveDecisionLimitMs : 0;
+  }
+  function updateInstructionLimitCopy() {
+    const el = $("instr-decision-limit");
+    if (!el) return;
+    if (liveDecisionLimitMs > 0) {
+      el.hidden = false;
+      el.innerHTML = "You will have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose a direction at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.";
+    } else {
+      el.hidden = true;
+      el.innerHTML = "";
+    }
+  }
+  function hideTooSlow() {
+    const el = $("too-slow");
+    if (!el) return;
+    el.hidden = true;
+    el.setAttribute("aria-hidden", "true");
+  }
+  function showTooSlow() {
+    const el = $("too-slow");
+    if (!el) return;
+    el.hidden = false;
+    el.setAttribute("aria-hidden", "false");
+  }
+  function hideDecisionTimer() {
+    const el = $("decision-timer");
+    if (!el) return;
+    el.hidden = true;
+    el.classList.remove("urgent");
+    el.setAttribute("aria-hidden", "true");
+  }
+  function showDecisionTimer() {
+    const el = $("decision-timer");
+    if (!el) return;
+    el.hidden = false;
+    el.setAttribute("aria-hidden", "false");
+    updateDecisionTimerVisual(decisionLimitTotalMs, decisionLimitTotalMs);
+  }
+  function updateDecisionTimerVisual(leftMs, totalMs) {
+    const fill = $("decision-timer-fill");
+    const num = $("decision-timer-num");
+    const wrap = $("decision-timer");
+    const total = totalMs > 0 ? totalMs : 1;
+    const left = Math.max(0, leftMs);
+    const frac = Math.max(0, Math.min(1, left / total));
+    if (fill) fill.style.transform = "scaleX(" + frac.toFixed(4) + ")";
+    if (num) num.textContent = String(Math.max(0, Math.ceil(left / 1000)));
+    if (wrap) wrap.classList.toggle("urgent", left > 0 && left <= 1000);
+  }
+  function clearDecisionLimit() {
+    if (decisionLimitTimer) { clearTimeout(decisionLimitTimer); decisionLimitTimer = null; }
+    if (decisionLimitRaf) { cancelAnimationFrame(decisionLimitRaf); decisionLimitRaf = null; }
+    decisionLimitDeadline = null;
+    decisionLimitRemainingMs = 0;
+    decisionLimitTotalMs = 0;
+    decisionLimitPaused = false;
+    decisionLimitSpec = null;
+    decisionLimitHiddenMs = 0;
+    decisionLimitPauseStarted = null;
+    hideDecisionTimer();
+  }
+  function tickDecisionTimer() {
+    if (decisionLimitRaf) cancelAnimationFrame(decisionLimitRaf);
+    const step = () => {
+      if (!decisionLimitDeadline || decisionLimitPaused) return;
+      const left = Math.max(0, decisionLimitDeadline - performance.now());
+      updateDecisionTimerVisual(left, decisionLimitTotalMs);
+      if (left > 0) decisionLimitRaf = requestAnimationFrame(step);
+    };
+    decisionLimitRaf = requestAnimationFrame(step);
+  }
+  function armDecisionLimitDeadline() {
+    decisionLimitDeadline = performance.now() + decisionLimitRemainingMs;
+    decisionLimitPaused = false;
+    if (decisionLimitTimer) clearTimeout(decisionLimitTimer);
+    decisionLimitTimer = setTimeout(() => onDecisionTimeout("expired"), decisionLimitRemainingMs);
+    tickDecisionTimer();
+  }
+  function startDecisionLimit(spec) {
+    clearDecisionLimit();
+    const limit = activeDecisionLimitMs(spec);
+    if (!limit) return;
+    decisionLimitSpec = spec;
+    decisionLimitTotalMs = limit;
+    decisionLimitRemainingMs = limit;
+    decisionLimitHiddenMs = 0;
+    showDecisionTimer();
+    if (document.hidden) {
+      pauseDecisionLimit("hidden_at_start");
+      return;
+    }
+    armDecisionLimitDeadline();
+  }
+  function pauseDecisionLimit(reason) {
+    if (!decisionLimitSpec || decisionLimitPaused) return;
+    if (decisionLimitDeadline != null) {
+      decisionLimitRemainingMs = Math.max(0, decisionLimitDeadline - performance.now());
+    }
+    decisionLimitPaused = true;
+    decisionLimitPauseStarted = performance.now();
+    if (decisionLimitTimer) { clearTimeout(decisionLimitTimer); decisionLimitTimer = null; }
+    if (decisionLimitRaf) { cancelAnimationFrame(decisionLimitRaf); decisionLimitRaf = null; }
+    decisionLimitDeadline = null;
+    updateDecisionTimerVisual(decisionLimitRemainingMs, decisionLimitTotalMs);
+    logEvent("decision_limit_paused", {
+      reason: reason || "tab_hidden",
+      remaining_ms: Math.round(decisionLimitRemainingMs),
+      trialIndex: decisionLimitSpec && decisionLimitSpec.trialIndex,
+      isPractice: !!(decisionLimitSpec && decisionLimitSpec.isPractice),
+    });
+  }
+  function resumeDecisionLimit() {
+    if (!decisionLimitPaused || !decisionLimitSpec) return;
+    if (decisionLimitPauseStarted != null) {
+      decisionLimitHiddenMs += Math.max(0, performance.now() - decisionLimitPauseStarted);
+      decisionLimitPauseStarted = null;
+    }
+    if (responding || currentEvent !== decisionLimitSpec || decisionOnsetPerf == null) {
+      clearDecisionLimit();
+      return;
+    }
+    decisionLimitPaused = false;
+    logEvent("decision_limit_resumed", {
+      remaining_ms: Math.round(decisionLimitRemainingMs),
+      hidden_ms: Math.round(decisionLimitHiddenMs),
+      trialIndex: decisionLimitSpec.trialIndex,
+    });
+    if (decisionLimitRemainingMs <= 0) {
+      onDecisionTimeout("expired_after_resume");
+      return;
+    }
+    armDecisionLimitDeadline();
+  }
+  function onVisibilityForDecisionLimit() {
+    if (!decisionLimitSpec) return;
+    if (document.hidden) pauseDecisionLimit("tab_hidden");
+    else resumeDecisionLimit();
+  }
+
   function introText(spec) {
+    const limitNote = liveDecisionLimitMs > 0
+      ? "<p>You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.</p>"
+      : "";
     if (spec.practiceIntro === "free") {
+      const practiceLimit = (liveDecisionLimitMs > 0 && CONFIG.DECISION_LIMIT_IN_PRACTICE)
+        ? "<p>The same time limit is used in practice so you can get used to it. You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose. If you run out of time, you will see “Too slow,” and the practice will continue.</p>"
+        : "";
       return { big: "Practice", html:
         "<p>First, a few practice intersections.</p>" +
+        practiceLimit +
         "<p>At the first ones there is no sign: simply choose either direction with ← or →.</p>" +
         "<p>Look around with the mouse if you like.</p>" };
     }
@@ -825,6 +1040,7 @@
       "<p>You are in a hospital environment.</p>" +
       `<p>Your task is to <strong>find \u201c${dest}\u201d${lvl}</strong>.</p>` +
       "<p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).</p>" +
+      limitNote +
       "<p>Please make your decision as <strong>quickly</strong>, and as <strong>accurately</strong> as you can.</p>" };
   }
   function startBlockIntro(spec) {
@@ -1258,7 +1474,10 @@
           pushMarker("decision_onset", {
             renderId: spec.renderId, boardId: spec.boardId, condition: spec.condition,
             note: "rt_clock_starts_after_entry_visible",
+            decisionLimitMs: activeDecisionLimitMs(spec),
           });
+          // Countdown starts exactly when the decision clock starts, never during the transition.
+          startDecisionLimit(spec);
         }, CONFIG.DECISION_DELAY_MS);
       });
     };
@@ -1314,19 +1533,16 @@
     };
   }
 
-  function recordDecisionResponse(choice) {
-    if (!choiceEnabled || responding || !currentEvent || decisionOnsetPerf == null) return;
-    if (currentEvent.kind !== "decision") return;
-    responding = true;
-    choiceEnabled = false;
-    $("btn-left").disabled = true;
-    $("btn-right").disabled = true;
-    const ev = currentEvent;
-    const responsePerf = performance.now();
-    const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
+  function buildDecisionRow(ev, opts) {
+    const o = opts || {};
+    const timedOut = !!o.timedOut;
+    const choice = timedOut ? "" : o.choice;
     const b = ev.boardId ? BOARDS[ev.boardId] : null;
-    pushMarker("response", { choice, rt_ms, trialType: "decision" });
-    const row = {
+    const responsePerf = o.responsePerf;
+    const rt_ms = timedOut ? "" : Math.round(responsePerf - decisionOnsetPerf);
+    const yaw = (pano && typeof pano.getYaw === "function") ? +pano.getYaw().toFixed(2) : "";
+    const pitch = (pano && typeof pano.getPitch === "function") ? +pano.getPitch().toFixed(2) : "";
+    return {
       ...baseRow(ev),
       trialType: "decision",
       trialIndex: ev.trialIndex,
@@ -1335,13 +1551,13 @@
       conditionLabel: ev.condition + (ev.stimulusPlaceholder ? "_PLACEHOLDER" : ""),
       choice,
       correctDirection: ev.correctDirection,
-      accuracy: ev.correctDirection ? (choice === ev.correctDirection ? 1 : 0) : "",
+      accuracy: ev.correctDirection ? (timedOut ? 0 : (choice === ev.correctDirection ? 1 : 0)) : "",
       rt_ms,
       scene_onset_perf: sceneOnsetPerf != null ? +sceneOnsetPerf.toFixed(1) : "",
-      decision_onset_perf: +decisionOnsetPerf.toFixed(1),
-      response_perf: +responsePerf.toFixed(1),
-      yaw_at_response: +pano.getYaw().toFixed(2),
-      pitch_at_response: +pano.getPitch().toFixed(2),
+      decision_onset_perf: decisionOnsetPerf != null ? +decisionOnsetPerf.toFixed(1) : "",
+      response_perf: responsePerf != null ? +responsePerf.toFixed(1) : "",
+      yaw_at_response: yaw,
+      pitch_at_response: pitch,
       probeLag: "",
       referencedTrialIndex: "",
       renderId: ev.renderId,
@@ -1359,18 +1575,97 @@
       panoRes: CONFIG.RES,
       transStyle: entryTransStyle || currentTransStyle(),
       timestamp: isoNow(),
+      decisionLimitMs: o.decisionLimitMs != null ? o.decisionLimitMs : activeDecisionLimitMs(ev),
+      timedOut: timedOut ? 1 : 0,
+      referencedTimedOut: "",
+      timeoutAdvanceDirection: o.timeoutAdvanceDirection || "",
+      decisionLimitHiddenMs: o.decisionLimitHiddenMs != null ? Math.round(o.decisionLimitHiddenMs) : 0,
     };
-    session.trials.push(row);
-    console.log("[trial]", row);
-    if (!ev.isPractice) decisionChoicesByIndex[ev.trialIndex] = choice;
-    syncResidency(); // evict this scene, upload the one GPU_WINDOW trials ahead, during the transition
+  }
+  function timeoutAdvanceDirection(ev) {
+    // The route is pre-planned; choices never change which panorama comes next.
+    // After a timeout we still play the exit transition toward the board-correct
+    // side (or right, when practice has no correct side) so the session does not diverge.
+    if (ev && (ev.correctDirection === "left" || ev.correctDirection === "right")) return ev.correctDirection;
+    return "right";
+  }
+  function continueAfterDecision(ev, walkDir) {
+    syncResidency();
     Promise.resolve()
-      .then(() => playExitTransition(choice))
+      .then(() => playExitTransition(walkDir))
       .catch((err) => { console.error("[transition]", err); clearTransitionVisuals(); })
       .then(() => {
+        if (currentEvent !== ev) return;
         resetResponseState();
         advance();
       });
+  }
+  function recordDecisionResponse(choice) {
+    if (!choiceEnabled || responding || !currentEvent || decisionOnsetPerf == null) return;
+    if (currentEvent.kind !== "decision") return;
+    responding = true;
+    choiceEnabled = false;
+    $("btn-left").disabled = true;
+    $("btn-right").disabled = true;
+    const ev = currentEvent;
+    const hiddenMs = decisionLimitHiddenMs;
+    clearDecisionLimit();
+    hideTooSlow();
+    const responsePerf = performance.now();
+    const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
+    pushMarker("response", { choice, rt_ms, trialType: "decision", timedOut: 0 });
+    const row = buildDecisionRow(ev, { choice, timedOut: false, responsePerf, decisionLimitHiddenMs: hiddenMs });
+    session.trials.push(row);
+    console.log("[trial]", row);
+    if (!ev.isPractice) decisionChoicesByIndex[ev.trialIndex] = choice;
+    continueAfterDecision(ev, choice);
+  }
+  function onDecisionTimeout(reason) {
+    if (responding || !currentEvent || decisionOnsetPerf == null) return;
+    if (currentEvent.kind !== "decision") return;
+    if (decisionLimitSpec && currentEvent !== decisionLimitSpec) return;
+    recordDecisionTimeout(reason || "expired");
+  }
+  function recordDecisionTimeout(reason) {
+    if (responding || !currentEvent || decisionOnsetPerf == null) return;
+    if (currentEvent.kind !== "decision") return;
+    responding = true;
+    choiceEnabled = false;
+    $("btn-left").disabled = true;
+    $("btn-right").disabled = true;
+    const ev = currentEvent;
+    const hiddenMs = decisionLimitHiddenMs + (decisionLimitPauseStarted != null ? Math.max(0, performance.now() - decisionLimitPauseStarted) : 0);
+    const limitMs = decisionLimitTotalMs || activeDecisionLimitMs(ev);
+    clearDecisionLimit();
+    const responsePerf = performance.now();
+    const walkDir = timeoutAdvanceDirection(ev);
+    pushMarker("decision_timeout", {
+      reason: reason || "expired",
+      trialType: "decision",
+      decisionLimitMs: limitMs,
+      hidden_ms: Math.round(hiddenMs),
+      timeoutAdvanceDirection: walkDir,
+    });
+    const row = buildDecisionRow(ev, {
+      timedOut: true,
+      responsePerf,
+      decisionLimitMs: limitMs,
+      timeoutAdvanceDirection: walkDir,
+      decisionLimitHiddenMs: hiddenMs,
+    });
+    session.trials.push(row);
+    console.log("[trial-timeout]", row);
+    // Do not store a choice for recall probes; a later probe that refers to this
+    // trial is scored with a blank accuracy and referencedTimedOut = 1.
+    showTooSlow();
+    const wait = CONFIG.DECISION_TIMEOUT_FEEDBACK_MS || 0;
+    const afterFeedback = () => {
+      hideTooSlow();
+      if (currentEvent !== ev) return;
+      continueAfterDecision(ev, walkDir);
+    };
+    if (wait > 0) setTimeout(afterFeedback, wait);
+    else afterFeedback();
   }
 
   function recordProbeResponse(choice) {
@@ -1383,8 +1678,10 @@
     const ev = currentEvent;
     const responsePerf = performance.now();
     const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
-    const correct = decisionChoicesByIndex[ev.referencedTrialIndex] || null;
-    pushMarker("probe_response", { choice, rt_ms, referencedTrialIndex: ev.referencedTrialIndex });
+    const referenced = session.trials.find((t) => t.trialType === "decision" && t.trialIndex === ev.referencedTrialIndex);
+    const referencedTimedOut = !!(referenced && +referenced.timedOut === 1);
+    const correct = referencedTimedOut ? null : (decisionChoicesByIndex[ev.referencedTrialIndex] || null);
+    pushMarker("probe_response", { choice, rt_ms, referencedTrialIndex: ev.referencedTrialIndex, referencedTimedOut: referencedTimedOut ? 1 : 0 });
     const row = {
       ...baseRow(ev),
       trialType: "recall_probe",
@@ -1403,6 +1700,9 @@
       referencedTrialIndex: ev.referencedTrialIndex,
       transStyle: currentTransStyle(),
       timestamp: isoNow(),
+      decisionLimitMs: "",
+      timedOut: 0,
+      referencedTimedOut: referencedTimedOut ? 1 : 0,
     };
     session.trials.push(row);
     console.log("[probe]", row);
@@ -1512,6 +1812,14 @@
   function r1(x) { return Math.round(x * 10) / 10; }
   function r2(x) { return Math.round(x * 100) / 100; }
   function pct(n, d) { return d ? r1((100 * n) / d) : null; }
+  function meanDecisionLatencyS(rows) {
+    const timed = (rows || []).filter((t) => !t.timedOut && t.rt_ms != null && t.rt_ms !== "");
+    if (!timed.length) return null;
+    return r2(timed.reduce((s, t) => s + Number(t.rt_ms), 0) / timed.length / 1000);
+  }
+  function countTimeouts(rows) {
+    return (rows || []).filter((t) => +t.timedOut === 1).length;
+  }
 
   /** Performance numbers shown to the participant for one condition (own data only; no norms). */
   function conditionPerformance(condition, pos) {
@@ -1519,7 +1827,7 @@
     const probes = session.trials.filter((t) => t.trialType === "recall_probe" && t.condition === condition);
     const nCorrect = dec.filter((t) => t.accuracy === 1).length;
     const nDec = dec.length;
-    const meanMs = nDec ? dec.reduce((s, t) => s + t.rt_ms, 0) / nDec : null;
+    const nTimeouts = countTimeouts(dec);
     const nProbeOk = probes.filter((t) => t.accuracy === 1).length;
     const blockKeys = [];
     dec.forEach((t) => {
@@ -1538,7 +1846,9 @@
         n_decisions: d.length,
         n_correct: ok,
         pct_correct: pct(ok, d.length),
-        mean_decision_latency_s: d.length ? r2(d.reduce((s, t) => s + t.rt_ms, 0) / d.length / 1000) : null,
+        n_timeouts: countTimeouts(d),
+        pct_timeouts: pct(countTimeouts(d), d.length),
+        mean_decision_latency_s: meanDecisionLatencyS(d),
         n_probes: p.length,
         n_probes_correct: pok,
         pct_probes_correct: pct(pok, p.length),
@@ -1551,7 +1861,9 @@
       n_decisions: nDec,
       n_correct: nCorrect,
       pct_correct: pct(nCorrect, nDec),
-      mean_decision_latency_s: meanMs != null ? r2(meanMs / 1000) : null,
+      n_timeouts: nTimeouts,
+      pct_timeouts: pct(nTimeouts, nDec),
+      mean_decision_latency_s: meanDecisionLatencyS(dec),
       n_probes: probes.length,
       n_probes_correct: nProbeOk,
       pct_probes_correct: pct(nProbeOk, probes.length),
@@ -1618,7 +1930,9 @@
       idRandomPart: session.idRandomPart, adminMode: adminMode ? 1 : 0, transStyle: currentTransStyle(),
       startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE,
       showSam: CONFIG.SHOW_SAM ? 1 : 0, showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
-      wordingVersion: CONFIG.WORDING_VERSION });
+      wordingVersion: CONFIG.WORDING_VERSION,
+      decisionLimitMs: liveDecisionLimitMs,
+      decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE ? 1 : 0 });
     withdrawArmed = true;
     setWithdrawVisible(true);
     pendingSegments = [practice].concat(condQueues.map((c) => c.queue)); // GPU look-ahead for the first window
@@ -1689,7 +2003,7 @@
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
-      <p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right). Please try to make your decision as soon as you can, while still trying to be accurate.${nearby}</p>
+      <p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, you will see “Too slow,” and the task will continue." : ""} Please try to make your decision as soon as you can, while still trying to be accurate.${nearby}</p>
       <p class="privacy-note"><strong>Nothing that identifies you is collected. You are known in the data only by a study code.</strong></p>
       ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}) — confirm before use.</p>` : ""}`,
       [{ id: "go", label: "Continue" }]);
@@ -2004,17 +2318,19 @@
     const blockRows = stats.blocks.map((b) =>
       `<tr><td>${escapeHtml(b.destination || ("Block " + b.block))}</td>` +
       `<td>${fmtCount(b.n_correct, b.n_decisions, b.pct_correct)}</td>` +
+      `<td>${fmtCount(b.n_timeouts, b.n_decisions, b.pct_timeouts)}</td>` +
       `<td>${fmtLatency(b.mean_decision_latency_s)}</td>` +
       `<td>${fmtCount(b.n_probes_correct, b.n_probes, b.pct_probes_correct)}</td></tr>`).join("");
     return `<div class="perf-card">
         <h2>Your results — Part ${pos} of ${nParts}</h2>
-        <p class="perf-lead">Here is a summary of your wayfinding performance in this part. These numbers are from your own responses only.</p>
+        <p class="perf-lead">Here is a summary of your wayfinding performance in this part. These numbers are from your own responses only. Timeouts count as incorrect direction choices. Average time is for answered intersections only.</p>
         <div class="perf-stats">
           <div class="perf-stat"><div class="val">${fmtLatency(stats.mean_decision_latency_s)}</div><div class="lbl">Average decision time</div></div>
           <div class="perf-stat"><div class="val">${stats.n_decisions ? stats.pct_correct + "%" : "—"}</div><div class="lbl">Correct direction choices<br>${fmtCount(stats.n_correct, stats.n_decisions, null)}</div></div>
+          <div class="perf-stat"><div class="val">${stats.n_decisions ? fmtCount(stats.n_timeouts, stats.n_decisions, stats.pct_timeouts) : "—"}</div><div class="lbl">Timed out</div></div>
           <div class="perf-stat"><div class="val">${stats.n_probes ? stats.pct_probes_correct + "%" : "—"}</div><div class="lbl">Recall questions correct<br>${fmtCount(stats.n_probes_correct, stats.n_probes, null)}</div></div>
         </div>
-        ${stats.blocks.length ? `<table class="perf-blocks"><thead><tr><th>Destination</th><th>Direction choices</th><th>Average time</th><th>Recall</th></tr></thead><tbody>${blockRows}</tbody></table>` : ""}
+        ${stats.blocks.length ? `<table class="perf-blocks"><thead><tr><th>Destination</th><th>Direction choices</th><th>Timed out</th><th>Average time</th><th>Recall</th></tr></thead><tbody>${blockRows}</tbody></table>` : ""}
       </div>`;
   }
 
@@ -2024,7 +2340,7 @@
     const probes = session.trials.filter((t) => t.trialType === "recall_probe");
     const nCorrect = dec.filter((t) => t.accuracy === 1).length;
     const nDec = dec.length;
-    const meanMs = nDec ? dec.reduce((s, t) => s + t.rt_ms, 0) / nDec : null;
+    const nTimeouts = countTimeouts(dec);
     const nProbeOk = probes.filter((t) => t.accuracy === 1).length;
     return {
       scope: "overall",
@@ -2034,7 +2350,9 @@
       n_decisions: nDec,
       n_correct: nCorrect,
       pct_correct: pct(nCorrect, nDec),
-      mean_decision_latency_s: meanMs != null ? r2(meanMs / 1000) : null,
+      n_timeouts: nTimeouts,
+      pct_timeouts: pct(nTimeouts, nDec),
+      mean_decision_latency_s: meanDecisionLatencyS(dec),
       n_probes: probes.length,
       n_probes_correct: nProbeOk,
       pct_probes_correct: pct(nProbeOk, probes.length),
@@ -2061,6 +2379,8 @@
           n_decisions: b.n_decisions,
           n_correct: b.n_correct,
           pct_correct: b.pct_correct,
+          n_timeouts: b.n_timeouts,
+          pct_timeouts: b.pct_timeouts,
           mean_decision_latency_s: b.mean_decision_latency_s,
           n_probes: b.n_probes,
           n_probes_correct: b.n_probes_correct,
@@ -2423,6 +2743,7 @@
     "intendedRenderId", "stimulusPlaceholder", "boardId", "boardFile", "layout", "cellId", "congruence",
     "targetRow", "scene_onset_perf", "pitch_at_response",
     "conditionName", "conditionPosition", "blockOrder", "cueType", "legacySceneId", "panoRes", "transStyle",
+    "decisionLimitMs", "timedOut", "referencedTimedOut", "timeoutAdvanceDirection", "decisionLimitHiddenMs",
   ];
   const Q_HEADERS = ["participantId", "seed", "conditionOrder", "phase", "administration", "condition", "conditionName",
     "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "otherText", "nChanges",
@@ -2437,7 +2758,7 @@
     "rt_ms", "limit_ms", "next_limit_ms", "next_level", "cutoff_reason",
     "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
   const SUMMARY_HEADERS = ["participantId", "scope", "condition", "conditionName", "conditionPosition", "block", "blockOrder", "destination",
-    "n_decisions", "n_correct", "pct_correct", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
+    "n_decisions", "n_correct", "pct_correct", "n_timeouts", "pct_timeouts", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
   function stressRows() {
     const rows = [];
     const add = (res, task) => {
@@ -2478,7 +2799,7 @@
   }
   function exportFiles() {
     const pid = session.participantId || "unknown";
-    const pre = `wayfinding_v48_${pid}_`;
+    const pre = `wayfinding_v49_${pid}_`;
     return {
       [pre + "session.json"]: JSON.stringify(session, null, 2),
       [pre + "trials.csv"]: sessionToCsv(session),
@@ -2523,13 +2844,17 @@
     }
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
-    $("header-meta").textContent = "v4.8 · mode: " + mode + (adminMode ? " · DEMO" : "") +
-      " · " + currentTransStyle() + " · " + CONFIG.RES;
+    updateInstructionLimitCopy();
+    $("header-meta").textContent = "v4.9 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+      " · " + currentTransStyle() + " · " + CONFIG.RES +
+      (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
     if (DEBUG) document.body.classList.add("debug");
     document.addEventListener("visibilitychange", () => {
-      if (!session.startedAt) return;
-      logEvent("visibility_change", { state: document.visibilityState, hidden: document.hidden ? 1 : 0 });
+      if (session.startedAt) {
+        logEvent("visibility_change", { state: document.visibilityState, hidden: document.hidden ? 1 : 0 });
+      }
+      onVisibilityForDecisionLimit();
     });
     window.addEventListener("blur", () => {
       if (session.startedAt && !session.completedAt) logEvent("window_blur", {});
@@ -2557,7 +2882,7 @@
     if ($("btn-restart")) $("btn-restart").addEventListener("click", () => location.reload());
     if ($("btn-fallback-download")) $("btn-fallback-download").addEventListener("click", () => {
       const files = exportFiles();
-      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v48_" + (session.participantId || "data") + "_session.json");
+      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v49_" + (session.participantId || "data") + "_session.json");
       downloadBlob(name, files[name] || JSON.stringify(session, null, 2), "application/json");
     });
     document.addEventListener("keydown", onKeyDown);
@@ -2572,12 +2897,14 @@
         get lastSave() { return lastSave; }, conditionPerformance, overallPerformance, ensureSummaries, stressRows, summaryRows, collectSummaries,
         playExitTransition, playEnterTransition, clearTransitionVisuals, peekNextEvent,
         uid, randomToken, randomIdPart, orderBit, idHashBit, parseTransStyle, currentTransStyle, setLiveTransStyle,
-        get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw };
+        get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
+        currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v4.8] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v4.9] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
-      transStyle: currentTransStyle(), adminMode: adminMode });
+      transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,
+      decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE });
     runSession().catch((err) => { console.error("[session]", err); logEvent("session_error", { message: String(err && err.message) }); });
   }
 

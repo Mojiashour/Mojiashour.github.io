@@ -1,11 +1,11 @@
 /**
- * v4.8 draft consent copy for IRB review (SOP 16 / Cornell informed-consent elements).
+ * v4.9 draft consent copy for IRB review (SOP 16 / Cornell informed-consent elements).
  * Bannered as DRAFT in the app. Do not treat as approved language.
  * CONSENT_TEXT_VERSION is logged with the click-through decision.
  */
 (function () {
   "use strict";
-  const CONSENT_TEXT_VERSION = "DRAFT_SOP16_2026-11-10_v48";
+  const CONSENT_TEXT_VERSION = "DRAFT_SOP16_2026-11-10_v49";
   const SOP16_VENDORS = "Please note that this study is being conducted with the help of GitHub (website hosting) and Google (data storage), companies not affiliated with Cornell and with their own privacy and security policies that you can find at their websites.";
   const SOP16_INTERNET_RISK = "We anticipate that your participation in this survey presents no greater risk than everyday use of the Internet.";
 
@@ -30,7 +30,7 @@
           <li>Answer questions about how you feel today and how you feel in general, including brief questionnaires about stress, anxiety, sense of direction, spatial anxiety, handedness, and how demanding the task felt.</li>
           <li>Complete a short practice of the wayfinding task so you can get used to the controls.</li>
           <li>Complete two short, timed mental arithmetic checks, one before each wayfinding part.</li>
-          <li>Complete two wayfinding parts. In each part you will view a series of hospital corridor intersections on the screen, look around with the mouse, and choose left or right with the keyboard to reach a destination. Some intersections include a short memory question about a recent turn.</li>
+          <li>Complete two wayfinding parts. In each part you will view a series of hospital corridor intersections on the screen, look around with the mouse, and choose left or right with the keyboard to reach a destination. At each intersection you will have a short time (5 seconds) to choose a direction. If you do not choose in time, that intersection is recorded as too slow and the task continues. Some intersections include a short memory question about a recent turn.</li>
           <li>After each destination and after each wayfinding part, rate how you feel and how demanding the task was.</li>
           <li>Answer questions about yourself at the end, including your age and other background questions. Age is required. For the other background questions you may choose “I prefer not to answer.”</li>
         </ul>
@@ -42,7 +42,7 @@
 
         <h3>Risks</h3>
         <p>${SOP16_INTERNET_RISK}</p>
-        <p>Some people may feel brief, mild stress or frustration during the timed arithmetic checks, similar to the feeling of being under time pressure on a short test. Some people may also feel mild motion discomfort or eye strain while looking around in the 360° images, similar to looking at a moving image on a screen. You may rest or withdraw at any time if you feel uncomfortable.</p>
+        <p>Some people may feel brief, mild stress or frustration during the timed arithmetic checks, or when choosing a direction under a short time limit at each intersection, similar to the feeling of being under time pressure on a short test. Some people may also feel mild motion discomfort or eye strain while looking around in the 360° images, similar to looking at a moving image on a screen. You may rest or withdraw at any time if you feel uncomfortable.</p>
 
         <h3>Benefits</h3>
         <p>You will not receive a direct personal benefit from taking part. The study may indirectly benefit others by informing research and design related to wayfinding in healthcare settings. Learning about how a research study is conducted, if applicable, is not a direct benefit. [PLACEHOLDER: if an educational benefit applies, describe it; course credit or payment should be described under Compensation, not as a benefit.]</p>

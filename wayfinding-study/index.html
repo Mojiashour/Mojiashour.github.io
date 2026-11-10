@@ -4,7 +4,7 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v4.8</title>
+  <title>Wayfinding Study v4.9</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -20,6 +20,15 @@
         <option value="C">C · cut</option>
         <option value="W">W · walk (default)</option>
         <option value="WI">WI — walk + dark iris</option>
+      </select>
+    </label>
+    <label class="admin-field">Decision limit
+      <select id="admin-decision-limit" aria-label="Decision time limit">
+        <option value="5000">5 s (default)</option>
+        <option value="4000">4 s</option>
+        <option value="3000">3 s</option>
+        <option value="2000">2 s</option>
+        <option value="0">Off</option>
       </select>
     </label>
     <label class="admin-field admin-check"><input type="checkbox" id="admin-saves"> Save to Drive</label>
@@ -47,7 +56,7 @@
 
   <header class="app-bar">
     <div class="study-wordmark">Moji Ashour</div>
-    <h1>Hospital Wayfinding · v4.8</h1>
+    <h1>Hospital Wayfinding · v4.9</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
   <button type="button" id="btn-withdraw" class="withdraw-link" hidden>Withdraw</button>
@@ -73,6 +82,7 @@
           </div>
         </li>
         <li>Please make your selection (right or left) as soon as you can.</li>
+        <li id="instr-decision-limit">You will have <strong>5 seconds</strong> to choose a direction at each intersection. If you run out of time, you will see “Too slow,” and the task will continue.</li>
         <li>Please stay focused.</li>
         <li>This is a serious data collection effort. Do not close this window or switch to another window during the experiment.</li>
       </ol>
@@ -103,6 +113,11 @@
             <div id="transition-overlay" aria-hidden="true"></div>
             <div id="vignette-overlay" aria-hidden="true"></div>
             <div id="iris-overlay" aria-hidden="true"></div>
+            <div id="decision-timer" class="decision-timer" hidden aria-hidden="true">
+              <div class="decision-timer-track"><div class="decision-timer-fill" id="decision-timer-fill"></div></div>
+              <span class="decision-timer-num" id="decision-timer-num" aria-hidden="true">5</span>
+            </div>
+            <div id="too-slow" class="too-slow" hidden aria-live="assertive" aria-hidden="true"><span>Too slow</span></div>
             <div id="intersection-label" class="intersection-label" hidden></div>
             <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
               <span id="placeholder-text" class="placeholder-text">Recall probe</span>
