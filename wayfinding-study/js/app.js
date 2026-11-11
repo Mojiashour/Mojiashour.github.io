@@ -4,7 +4,7 @@
  * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
  * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
  * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
- * Wayfinding SPA v4.5 — visual restyle to match moji-ashour.com; task logic unchanged from v4.4.
+ * Wayfinding SPA v4.5 — visual restyle (minimal study design language); task logic unchanged from v4.4.
  * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
  * a stress induction before each
  * wayfinding condition, Nature + Poster(Abstract) conditions on the FINAL 6000x3000 renders, a short

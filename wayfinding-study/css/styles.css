@@ -843,7 +843,7 @@ table.matrix td:not(.qtext) { text-align: center; }
 }
 
 
-/* ===================== v4.5: site design language (moji-ashour.com) ===================== */
+/* ===================== v4.5: minimal study design language ===================== */
 em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: 0; }
 .kicker {
   font-size: 13px;
