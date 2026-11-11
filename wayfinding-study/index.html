@@ -24,9 +24,9 @@
     </label>
     <label class="admin-field">Decision limit
       <select id="admin-decision-limit" aria-label="Decision time limit">
-        <option value="5000">5 s (default)</option>
+        <option value="5000">5 s</option>
         <option value="4000">4 s</option>
-        <option value="3000">3 s</option>
+        <option value="3000">3 s (default)</option>
         <option value="2000">2 s</option>
         <option value="0">Off</option>
       </select>
@@ -82,7 +82,7 @@
           </div>
         </li>
         <li>Please make your selection (right or left) as soon as you can.</li>
-        <li id="instr-decision-limit">You will have <strong>5 seconds</strong> to choose a direction at each intersection. If you do not choose within 5 seconds, a “Time’s up” message appears and the study moves on to the next intersection.</li>
+        <li id="instr-decision-limit">You will have <strong>3 seconds</strong> to choose a direction at each intersection. If you do not choose within 3 seconds, a “Time’s up” message appears and the study moves on to the next intersection.</li>
         <li>Please stay focused.</li>
         <li>This is a serious data collection effort. Do not close this window or switch to another window during the experiment.</li>
       </ol>
@@ -115,7 +115,7 @@
             <div id="iris-overlay" aria-hidden="true"></div>
             <div id="decision-timer" class="decision-timer" hidden aria-hidden="true">
               <div class="decision-timer-track"><div class="decision-timer-fill" id="decision-timer-fill"></div></div>
-              <span class="decision-timer-num" id="decision-timer-num" aria-hidden="true">5</span>
+              <span class="decision-timer-num" id="decision-timer-num" aria-hidden="true">3</span>
             </div>
             <div id="times-up" class="times-up" hidden aria-live="polite" aria-hidden="true"><span>Time’s up</span></div>
             <div id="intersection-label" class="intersection-label" hidden></div>

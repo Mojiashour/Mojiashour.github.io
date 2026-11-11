@@ -25,7 +25,7 @@
     return false;
   }
 
-  const WORDING_VERSION = "DRAFT_IRB_2026-11-10_v48";
+  const WORDING_VERSION = "DRAFT_IRB_2026-11-11_v49";
 
   const PREP_COPY = {
     first: {
@@ -104,7 +104,7 @@
       <p class="draft-banner"><strong>DRAFT for IRB review</strong> — this is not final, IRB-approved debrief language. Contact details for the faculty advisor are placeholders.</p>
       <p>During the timed arithmetic checks, a bar compared your accuracy with an “average” of other participants.</p>
       <p>That average was <strong>not</strong> a real average of other participants. It was a fixed reference value (75%) used to create mild evaluative pressure. The problems were designed to be difficult in the time allowed. Performance on this task is not a measure of your ability.</p>
-      <p>The time limit at each wayfinding intersection (5 seconds) was real. If you did not choose in time, a “Time’s up” message appeared and the study continued to the next intersection.</p>
+      <p>The time limit at each wayfinding intersection (3 seconds) was real. If you did not choose in time, a “Time’s up” message appeared and the study continued to the next intersection.</p>
       <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. Some details of the procedures were not fully described at the start of the session so that the experience would be closer to ordinary time pressure. We are sorry for any discomfort this may have caused.</p>
       <p>If you have questions or would like to talk about how you felt during the task, please contact Mojtaba Ashour, student researcher, at <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a>, or Saleh Kalantari, Ph.D., faculty advisor, at [PLACEHOLDER: email and phone]. You may also contact the Cornell Institutional Review Board for Human Participant Research at <a href="mailto:irbhp@cornell.edu">irbhp@cornell.edu</a> or 607-255-5138.</p>
       <p>If you would prefer that your responses not be included in the analysis, you may select <strong>Exclude my data</strong> below. Because the study does not collect your name, later requests to remove data may not be possible unless you have kept your study ID.</p>
@@ -886,14 +886,17 @@
    * From the paper (used as specified):
    *   - 90 s block; duration is not shown to the participant
    *   - two-number + − × ÷ problems, operands 1–99, answers 1–99
-   *   - 3 s per-item limit (the paper's starting value for the DST, here
-   *     held fixed for everyone: no ±10% adaptation, no keypad shuffle)
+   *   - 5 s per-item limit, held fixed for everyone (no ±10% adaptation,
+   *     no keypad shuffle). This departs from Norden et al., whose DST
+   *     started at 3 s and then sped up or slowed down; the 5 s value
+   *     was chosen for this study because the two-number problems often
+   *     need more time.
    *   - fake comparison average of 75%
    *   - feedback "Wrong answer!" / "Too slow!"; red cue; next item
    *     immediately after a correct answer
    *   - 3 s countdown before the block
    *   - no practice problems and no practice-based timing (Norden did not
-   *     use a practice baseline; timing started at a fixed 3 s)
+   *     use a practice baseline; their timing started at a fixed 3 s)
    *
    * Our choices (not a published item list):
    *   - two fixed lists (A, B), identical for every participant, written
@@ -907,7 +910,7 @@
 
   const DST_DEFAULTS = {
     DURATION_S: 90,
-    LIMIT_MS: 3000,          // Norden et al.: first-item limit in the DST
+    LIMIT_MS: 5000,          // study default (fixed); departs from Norden et al. 3 s start / adaptive
     AVERAGE_PCT: 75,         // Norden et al.: fabricated comparison average
     COUNTDOWN_S: 3,          // Norden et al. / openDST CountdownBeforeTask
     ANTICIPATION_MIN_S: 20,  // grant/memo: 20–30 s anticipatory screen
@@ -923,13 +926,13 @@
     first: {
       title: "Short performance check",
       html: `<p>You will now complete a short, timed arithmetic test. It is used as a brief check of performance under time pressure, of the kind people often feel before a test or presentation.</p>
-        <p>You will have only a few seconds for each problem. Your accuracy will be compared with the average of other participants in this study.</p>
+        <p>You will have {limit} for each problem. Your accuracy will be compared with the average of other participants in this study.</p>
         <p>Enter each answer with the number keys or the keypad. Please sit still, get ready, and start when you are prepared.</p>`,
     },
     second: {
       title: "Short performance check",
       html: `<p>You will now complete a second short, timed arithmetic test. As before, this is a brief check of performance under time pressure, and your accuracy will also be compared with the average of other participants in this study.</p>
-        <p>You will have only a few seconds for each problem. Enter each answer with the number keys or the keypad.</p>
+        <p>You will have {limit} for each problem. Enter each answer with the number keys or the keypad.</p>
         <p>Please sit still, get ready, and start when you are prepared.</p>`,
     },
     ready: "I’m ready",
@@ -1107,17 +1110,27 @@
     return html;
   }
 
+  function dstItemLimitLabel(ms) {
+    const n = (ms == null || !isFinite(+ms) || +ms <= 0) ? DST_DEFAULTS.LIMIT_MS : +ms;
+    const s = n / 1000;
+    const txt = Number.isInteger(s) ? String(s) : String(Math.round(s * 10) / 10);
+    return txt + (s === 1 ? " second" : " seconds");
+  }
+
   function runDstAnticipation(host, cfg, onEvent) {
+
     const C = Object.assign({}, DST_DEFAULTS, cfg || {});
     const variant = C.variant === "second" ? "second" : "first";
     const copy = DST_COPY[variant];
     const minS = C.ANTICIPATION_MIN_S;
     const maxS = C.ANTICIPATION_MAX_S;
+    const limitLabel = dstItemLimitLabel(C.LIMIT_MS);
+    const copyHtml = String(copy.html || "").replace(/\{limit\}/g, limitLabel);
     return new Promise((resolve) => {
       host.innerHTML = `<div class="dst dst-anticipation" data-dst-variant="${variant}">
         <p class="dst-kicker">Performance check</p>
         <h2 class="dst-title">${copy.title}</h2>
-        <div class="dst-copy">${copy.html}</div>
+        <div class="dst-copy">${copyHtml}</div>
         <p class="dst-wait" id="dst-wait"></p>
         <div class="btn-row">
           <button type="button" class="dst-ready" id="dst-ready" disabled>${DST_COPY.ready}</button>
@@ -1170,7 +1183,7 @@
       btn.addEventListener("click", () => finish("ready"));
       document.addEventListener("keydown", onKey, true);
       activeSkip = () => finish("skipped");
-      onEvent && onEvent("dst_anticipation_start", { variant: variant, min_s: minS, max_s: maxS, wordingVersion: C.wordingVersion || WORDING_VERSION });
+      onEvent && onEvent("dst_anticipation_start", { variant: variant, min_s: minS, max_s: maxS, limit_ms: C.LIMIT_MS, wordingVersion: C.wordingVersion || WORDING_VERSION });
       raf = requestAnimationFrame(tick);
     });
   }

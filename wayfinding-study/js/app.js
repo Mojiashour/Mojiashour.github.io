@@ -1,5 +1,5 @@
 /**
- * Wayfinding SPA v4.9 — per-intersection decision time limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
+ * Wayfinding SPA v4.9 — per-intersection decision time limit (default 3 s) and DST per-item limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
  * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
  * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
  * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
@@ -22,14 +22,14 @@
  *   ?res=6k | 4k              panorama derivative (default 6k = 6000x3000 JPEG; 4k = 4096x2048)
  *   ?trialsPerBlock=4         pilot / debugging (default 14)
  *   ?dstSec=90                duration of each DST math block in seconds (default 90; ?mistSec is an alias)
- *   ?dstLimitMs=3000          fixed per-problem time limit in ms (default 3000; Norden DST starting value)
+ *   ?dstLimitMs=5000          fixed per-problem time limit in ms (default 5000; departs from Norden's 3 s starting / adaptive limit)
  *   ?dstAvg=75                fixed comparison-average marker (default 75, as in Norden et al.)
  *   ?legacyMist=1             use the previous adaptive MIST-style block instead of the DST
  *   ?mistSec=90               alias for ?dstSec=; also used if ?legacyMist=1
  *   ?mistPracticeSec=40       untimed MIST practice when ?legacyMist=1 (default 40; 0 skips practice)
  *   ?mistAvg=85               MIST average marker when ?legacyMist=1 (clamped 80–90)
  *   ?mistMsg=1                brief negative-evaluative messages in the legacy MIST block (default off)
- *   ?decisionLimit=5000       per-intersection decision time limit in ms (default 5000; 0 = off). Starts when the
+ *   ?decisionLimit=3000       per-intersection decision time limit in ms (default 3000; 0 = off). Starts when the
  *                             decision clock starts (scene fully visible + DECISION_DELAY_MS), never during a transition.
  *   ?decisionLimitPractice=0  do not apply the decision limit during practice (default: applied, so people learn it)
  *   ?decisionTimeoutFeedbackMs=700  duration of the “Time’s up” message after a timeout (default 700)
@@ -105,7 +105,7 @@
     STRESS_MODE: stressModeFromParams(), // default dst; ?legacyMist=1, ?prep=1 or ?liveStress=1 select legacy modules
     PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
     DST_S: num("dstSec", num("mistSec", 90)),
-    DST_LIMIT_MS: num("dstLimitMs", 3000),
+    DST_LIMIT_MS: num("dstLimitMs", 5000),
     DST_AVG: Math.max(0, Math.min(100, num("dstAvg", 75))),
     DST_ANTICIPATION_MIN_S: num("dstAnticipationMinSec", 20),
     DST_ANTICIPATION_MAX_S: num("dstAnticipationMaxSec", 30),
@@ -131,9 +131,9 @@
     WI_IN_MS: 450,
     END_MATH: params.get("endMath") === "1", // default off
     END_MATH_S: num("mathSec", 120),
-    WORDING_VERSION: "DRAFT_IRB_2026-11-10_v49",
+    WORDING_VERSION: "DRAFT_IRB_2026-11-11_v49",
     // v4.9: per-intersection decision limit. 0 disables. Applied in practice by default (easy to turn off).
-    DECISION_LIMIT_MS: num("decisionLimit", 5000),
+    DECISION_LIMIT_MS: num("decisionLimit", 3000),
     DECISION_LIMIT_IN_PRACTICE: params.get("decisionLimitPractice") !== "0",
     DECISION_TIMEOUT_FEEDBACK_MS: Math.max(0, num("decisionTimeoutFeedbackMs", 700)),
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
@@ -1932,7 +1932,8 @@
       showSam: CONFIG.SHOW_SAM ? 1 : 0, showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION,
       decisionLimitMs: liveDecisionLimitMs,
-      decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE ? 1 : 0 });
+      decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE ? 1 : 0,
+      dstLimitMs: CONFIG.DST_LIMIT_MS, dstSec: CONFIG.DST_S });
     withdrawArmed = true;
     setWithdrawVisible(true);
     pendingSegments = [practice].concat(condQueues.map((c) => c.queue)); // GPU look-ahead for the first window
