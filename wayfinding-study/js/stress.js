@@ -107,7 +107,6 @@
       <p>The time limit at each wayfinding intersection (3 seconds) was real. If you did not choose in time, a “Time’s up” message appeared and the study continued to the next intersection.</p>
       <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. Some details of the procedures were not fully described at the start of the session so that the experience would be closer to ordinary time pressure. We are sorry for any discomfort this may have caused.</p>
       <p>If you have questions or would like to talk about how you felt during the task, please contact Mojtaba Ashour, student researcher, at <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a>, or Saleh Kalantari, Ph.D., faculty advisor, at [PLACEHOLDER: email and phone]. You may also contact the Cornell Institutional Review Board for Human Participant Research at <a href="mailto:irbhp@cornell.edu">irbhp@cornell.edu</a> or 607-255-5138.</p>
-      <p>If you would prefer that your responses not be included in the analysis, you may select <strong>Exclude my data</strong> below. Because the study does not collect your name, later requests to remove data may not be possible unless you have kept your study ID.</p>
       <p><strong>[PLACEHOLDER: any further clarification the IRB requires.]</strong></p>`,
   };
 
@@ -911,7 +910,7 @@
    *   and source "generated".
    *
    * Our other choices:
-   *   - 20–30 s anticipatory screen, then "I'm ready", then the countdown
+   *   - 20 s minimum anticipatory screen, then "I'm ready" (v5.2: never auto-starts), then the countdown
    *   - no camera, no speech, no random keypad, no "only serious results"
    *     line (the last per the study memo, for a student sample)
    * ======================================================================== */
@@ -932,19 +931,21 @@
 
   const DST_COPY = {
     first: {
-      title: "Short performance check",
-      html: `<p>You will now complete a short, timed arithmetic test. It is used as a brief check of performance under time pressure, of the kind people often feel before a test or presentation.</p>
-        <p>You will have {limit} for each problem. Your accuracy will be compared with the average of other participants in this study.</p>
-        <p>Enter each answer with the number keys or the keypad. Please sit still, get ready, and start when you are prepared.</p>`,
+      title: "Math ability test",
+      html: `<p>Your <strong>math ability</strong> will now be <strong>evaluated</strong> under time pressure.</p>
+        <p>You will have <strong>{limit}</strong> for each problem. Your accuracy will be <strong>compared with other participants</strong> in this study.</p>
+        <p>Enter each answer with the number keys or the keypad. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p class="read-note"><strong>Please read all instructions carefully.</strong></p>`,
     },
     second: {
-      title: "Short performance check",
-      html: `<p>You will now complete a second short, timed arithmetic test. As before, this is a brief check of performance under time pressure, and your accuracy will also be compared with the average of other participants in this study.</p>
-        <p>You will have {limit} for each problem. Enter each answer with the number keys or the keypad.</p>
-        <p>Please sit still, get ready, and start when you are prepared.</p>`,
+      title: "Math ability test",
+      html: `<p>Your <strong>math ability</strong> will now be <strong>evaluated again</strong> under time pressure.</p>
+        <p>You will have <strong>{limit}</strong> for each problem. Your accuracy will again be <strong>compared with other participants</strong> in this study.</p>
+        <p>Enter each answer with the number keys or the keypad. Press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p class="read-note"><strong>Please read all instructions carefully.</strong></p>`,
     },
     ready: "I’m ready",
-    wait: "The start button will be available in {n} seconds.",
+    wait: "Available in {n} s",
     countdownLabel: "Get ready",
     taskTitle: "Timed arithmetic",
     hint: "Enter your answer with the number keys or the keypad.",
@@ -1136,7 +1137,7 @@
     const copyHtml = String(copy.html || "").replace(/\{limit\}/g, limitLabel);
     return new Promise((resolve) => {
       host.innerHTML = `<div class="dst dst-anticipation" data-dst-variant="${variant}">
-        <p class="dst-kicker">Performance check</p>
+        <p class="dst-kicker">Math assessment</p>
         <h2 class="dst-title">${copy.title}</h2>
         <div class="dst-copy">${copyHtml}</div>
         <p class="dst-wait" id="dst-wait"></p>
@@ -1184,7 +1185,7 @@
         } else if (wait) {
           wait.textContent = DST_COPY.wait.replace("{n}", String(leftMin));
         }
-        if (elapsed >= maxS) { finish("auto"); return; }
+        // v5.2: NO auto-start. The test begins only when the participant presses "I'm ready" (maxS no longer used to start it).
         raf = requestAnimationFrame(tick);
       };
 
@@ -1574,7 +1575,7 @@
     const avg = s.average_marker_pct == null ? 75 : s.average_marker_pct;
     const n = s.n_responses || 0;
     const ok = s.n_correct || 0;
-    return `<p class="dst-kicker">Performance check</p>
+    return `<p class="dst-kicker">Math assessment</p>
       <h2 class="dst-title">Your results</h2>
       <p>Your accuracy: <strong>${you}%</strong> (${ok} of ${n} problems correct).</p>
       <p>Comparison average: <strong>${avg}%</strong>.</p>`;

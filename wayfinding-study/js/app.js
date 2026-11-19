@@ -1,5 +1,13 @@
 /**
- * Wayfinding SPA v5.0 — data output only: <pid>_questionnaires.csv (long, one row per timepoint) + <pid>_trials.csv + raw/ folder (js/export.js);
+ * Wayfinding SPA v5.2 — advisor-meeting changes: wider frame / larger text / right-aligned primary buttons; read-delay countdown before every instruction
+ * page's primary button; reworded welcome, math-assessment intro (no auto-start), destination intro; first 3 practice intersections untimed then 3 s
+ * (practiceTiming logged); red per-decision timer bar (subtle overall progress); recall-probe -> next intersection uses the normal arrival animation;
+ * questionnaire headings removed, sleep/age dropdowns, horizontal familiarity scale, demographics occupation item removed; "Exclude my data" removed;
+ * end flow = loading screen -> compact 4-box results -> final "saved" page (all v5.1 safeguards kept).
+ * Wayfinding SPA v5.1 — v5.1 adds neutral "response registered" feedback (chosen side highlighted + "✓ Left"/"✓ Right" pill, same for
+ * every choice, never correct/incorrect) at intersections (RESPONSE_ACK_MS) and recall probes (PROBE_ACK_MS); extra presses during
+ * the feedback window are ignored and logged as "response_ignored". RT is stamped at the press, before any feedback is drawn.
+ * (v5.0:) data output only: <pid>_questionnaires.csv (long, one row per timepoint) + <pid>_trials.csv + raw/ folder (js/export.js);
  *   SAM removed; conditionOrder written as Nature_first / Poster_first. Task, timing and randomisation logic are identical to v4.9.
  * Wayfinding SPA v4.9 — per-intersection decision time limit (default 3 s) and DST per-item limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
  * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
@@ -75,6 +83,10 @@
   }
 
   const CONFIG = {
+    END_MIN_LOAD_MS: Math.max(0, num("loadMs", 1500)),     // v5.2: minimum time the "Loading your results" screen stays up
+    READ_DELAY_SCALE: Math.max(0, num("readDelay", 1)),   // v5.2: 1 = full countdown before instruction buttons enable; 0 disables (tests only)
+    RESPONSE_ACK_MS: Math.max(0, num("ackMs", 350)),      // v5.1: neutral "choice registered" feedback at intersections (shown over the exit walk; no added delay)
+    PROBE_ACK_MS: Math.max(0, num("probeAckMs", 450)),    // v5.1: same for recall probes (replaces the old silent 350 ms wait)
     DECISION_DELAY_MS: 500,
     PROBE_DELAY_MS: 500,
     PROBE_LAG: 3,
@@ -135,6 +147,8 @@
     // v4.9: per-intersection decision limit. 0 disables. Applied in practice by default (easy to turn off).
     DECISION_LIMIT_MS: num("decisionLimit", 3000),
     DECISION_LIMIT_IN_PRACTICE: params.get("decisionLimitPractice") !== "0",
+    PRACTICE_UNTIMED_N: Math.max(0, num("practiceUntimed", 3)), // v5.2: the first N practice intersections have no time limit, the rest use the 3 s limit
+    PRACTICE_MIN_TIMED: 2,
     DECISION_TIMEOUT_FEEDBACK_MS: Math.max(0, num("decisionTimeoutFeedbackMs", 700)),
     STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
       LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
@@ -218,7 +232,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v5.0",
+    appVersion: "v5.2",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -356,7 +370,7 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v50_";
+  const STORAGE_PREFIX = "wf_v52_";
   const LEGACY_STORAGE_PREFIXES = ["wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
@@ -582,7 +596,14 @@
       appVersion: session.appVersion, startedAt: session.startedAt, completedAt: session.completedAt || "",
       endReason: session.endReason || "", reason, savedAt: isoNow(),
     };
-    const payload = { participantId: session.participantId, reason, files: exportFiles(), meta };
+    let files;
+    try { files = exportFiles(); } catch (err) {
+      // v5.1: an export bug must never block the study or the end screen; save the raw session instead.
+      console.error("[export]", err);
+      logEvent("export_error", { message: String(err && err.message || err) });
+      files = { ["raw/" + session.participantId + "_session.json"]: JSON.stringify(session, null, 2) };
+    }
+    const payload = { participantId: session.participantId, reason, files, meta };
     const p = (window.WFBackend && window.WFBackend.save)
       ? window.WFBackend.save(payload)
       : Promise.resolve({ ok: false, adapter: "none", error: "no_backend" });
@@ -731,19 +752,36 @@
     const conds = order.split("").map((c) => (c === "N" ? "Nature" : "Abstract"));
     TRAINING = ["T1"].concat(order[0] === "A" ? ["T2P", "T2"] : ["T2", "T2P"], ["T3", "T4"])
       .filter((t) => !(t === "T2P" && CONFIG.ABSTRACT_MODE !== "real")).map((t) => TRAINING_BASE[t]);
+    // v5.2: first PRACTICE_UNTIMED_N practice intersections are untimed (look around freely); then a "3 seconds from now on"
+    // screen; the remaining practice intersections are timed (at least PRACTICE_MIN_TIMED, repeating the sign boards if needed).
+    const trainingSeq = TRAINING.slice();
+    // (TRAINING is replaced by trainingSeq below so progress/preload use the final practice list)
+    if (CONFIG.PRACTICE_UNTIMED_N > 0) {
+      const extras = [TRAINING_BASE.T3, TRAINING_BASE.T4];
+      for (let k = 0; trainingSeq.length - CONFIG.PRACTICE_UNTIMED_N < CONFIG.PRACTICE_MIN_TIMED; k++) {
+        const base = extras[k % 2];
+        trainingSeq.push(Object.assign({}, base, { trainingId: base.trainingId + "r" + (Math.floor(k / 2) + 1), repeat: true }));
+      }
+    }
+    TRAINING = trainingSeq;
     const practice = [{ kind: "blockIntro", isPractice: true, practiceIntro: "free", condition: "Training", block: 0 }];
-    TRAINING.forEach((t, i) => {
+    trainingSeq.forEach((t, i) => {
+      const timedMode = (CONFIG.PRACTICE_UNTIMED_N > 0 && i >= CONFIG.PRACTICE_UNTIMED_N) || CONFIG.PRACTICE_UNTIMED_N === 0;
+      if (CONFIG.PRACTICE_UNTIMED_N > 0 && i === CONFIG.PRACTICE_UNTIMED_N) {
+        practice.push({ kind: "blockIntro", isPractice: true, practiceIntro: "timed", condition: "Training", block: 0 });
+      }
       if (t.trainingId === "T3") {
         const b = BOARDS[t.boardId];
         practice.push({ kind: "blockIntro", isPractice: true, condition: "Training", block: 0, destination: b.destination, level: b.dest_level });
       }
       practice.push({ kind: "decision", isPractice: true, trialIndex: 0, trainingId: t.trainingId,
+        practiceTiming: timedMode ? "timed" : "untimed",
         condition: "Training", block: 0, blockPos: i + 1, renderId: t.renderId, intendedRenderId: t.renderId, boardId: t.boardId,
         correctDirection: t.correctDirection, prompt: t.prompt,
         destination: t.boardId ? BOARDS[t.boardId].destination : "", stimulusPlaceholder: 0 });
     });
     let trialIndex = 0, probeSerial = 0;
-    const plan = { seed, order: WFX.orderLabel(order), orderSource, training: TRAINING.map((t) => t.trainingId), blocks: [] };
+    const plan = { seed, order: WFX.orderLabel(order), orderSource, training: trainingSeq.map((t) => t.trainingId), blocks: [] };
     const condQueues = conds.map((cond, ci) => {
       const queue = [];
       shuffle([1, 2, 3], rnd).forEach((blockNo, bi) => {
@@ -809,6 +847,25 @@
     return urls;
   }
 
+  /* ---------------- v5.1: neutral response-registered feedback ---------------- */
+  let ackTimer = null, lastResponsePerf = 0, ackShownPerf = 0;
+  function showResponseAck(choice, ms) {
+    const el = $("response-ack");
+    if (!el) return;
+    clearTimeout(ackTimer);
+    el.className = "response-ack " + choice;
+    $("response-ack-text").textContent = choice === "left" ? "← ✓ Left" : "✓ Right →";
+    el.hidden = false;
+    ackShownPerf = performance.now();
+    ackTimer = setTimeout(hideResponseAck, ms);
+  }
+  function hideResponseAck() {
+    clearTimeout(ackTimer); ackTimer = null;
+    const el = $("response-ack");
+    if (el) el.hidden = true;
+  }
+  const sleepUntilAckDone = (ms) => new Promise((res) => setTimeout(res, Math.max(0, ackShownPerf + ms - performance.now())));
+
   /* ---------------- UI helpers ---------------- */
   function setDecisionUI(enabled) {
     choiceEnabled = enabled;
@@ -839,6 +896,7 @@
     decisionOnsetPerf = null;
     clearDecisionLimit();
     hideTimesUp();
+    hideResponseAck();
     ["btn-left", "btn-right", "btn-probe-left", "btn-probe-right"].forEach((id) => ($(id).disabled = true));
     setDecisionUI(false);
     setProbeUI(false);
@@ -879,7 +937,7 @@
   function decisionLimitApplies(spec) {
     if (!spec || spec.kind !== "decision") return false;
     if (!liveDecisionLimitMs || liveDecisionLimitMs <= 0) return false;
-    if (spec.isPractice && !CONFIG.DECISION_LIMIT_IN_PRACTICE) return false;
+    if (spec.isPractice) return !!CONFIG.DECISION_LIMIT_IN_PRACTICE && spec.practiceTiming !== "untimed";
     return true;
   }
   function activeDecisionLimitMs(spec) {
@@ -890,7 +948,7 @@
     if (!el) return;
     if (liveDecisionLimitMs > 0) {
       el.hidden = false;
-      el.innerHTML = "You will have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose a direction at each intersection. If you do not choose within " + escapeHtml(decisionLimitLabel()) + ", a “Time’s up” message appears and the study moves on to the next intersection.";
+      el.innerHTML = "In the task you <strong>must</strong> choose a direction within <strong>" + escapeHtml(decisionLimitLabel()) + "</strong>. If you do not, a “Time’s up” message appears and the study moves on to the next intersection.";
     } else {
       el.hidden = true;
       el.innerHTML = "";
@@ -1024,27 +1082,27 @@
   }
 
   function introText(spec) {
-    const limitNote = liveDecisionLimitMs > 0
-      ? "<p>You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection.</p>"
-      : "";
+    const lim = liveDecisionLimitMs > 0 ? escapeHtml(decisionLimitLabel()) : "";
     if (spec.practiceIntro === "free") {
-      const practiceLimit = (liveDecisionLimitMs > 0 && CONFIG.DECISION_LIMIT_IN_PRACTICE)
-        ? "<p>The same time limit is used in practice so you can get used to it. You have <strong>" + escapeHtml(decisionLimitLabel()) + "</strong> to choose. If you do not choose in time, a “Time’s up” message appears and the practice moves on to the next intersection.</p>"
-        : "";
       return { big: "Practice", html:
         "<p>First, a few practice intersections.</p>" +
-        practiceLimit +
-        "<p>At the first ones there is no sign: simply choose either direction with ← or →.</p>" +
+        "<p>The first ones have <strong>no time limit</strong>. There is no sign: choose either direction with <strong>← or →</strong>.</p>" +
         "<p>Look around with the mouse if you like.</p>" };
+    }
+    if (spec.practiceIntro === "timed") {
+      return { big: lim ? "From now on: " + lim : "Practice", html: lim
+        ? "<p>From now on you have <strong>" + lim + "</strong> at each intersection.</p>" +
+          "<p>You <strong>must</strong> choose a direction within <strong>" + lim + "</strong>. If you do not, a “Time’s up” message appears and you move on to the next intersection.</p>"
+        : "<p>The next practice intersections use a sign.</p>" };
     }
     const dest = escapeHtml(spec.destination);
     const lvl = spec.level != null && spec.level !== "" ? ` (Level ${escapeHtml(String(spec.level))})` : "";
     return { big: spec.destination, html:
-      "<p>You are in a hospital environment.</p>" +
-      `<p>Your task is to <strong>find \u201c${dest}\u201d${lvl}</strong>.</p>` +
-      "<p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).</p>" +
-      limitNote +
-      "<p>Please make your decision as <strong>quickly</strong>, and as <strong>accurately</strong> as you can.</p>" };
+      `<p>Find <strong>\u201c${dest}\u201d</strong>${lvl}.</p>` +
+      (lim ? `<p>At each intersection you <strong>must</strong> choose a direction (left or right) within <strong>${lim}</strong>.</p>`
+           : "<p>At each intersection, choose a direction (left or right).</p>") +
+      "<p>Choose <strong>quickly</strong> and <strong>accurately</strong>.</p>" +
+      (spec.isPractice ? "" : "<p>This part takes about 1 minute.</p>") };
   }
   function startBlockIntro(spec) {
     currentEvent = spec;
@@ -1063,6 +1121,13 @@
     $("intro-prompt").textContent = spec.isPractice && spec.practiceIntro ? "Practice" : `Your destination: ${spec.destination}`;
     $("intro-sub").textContent = "Press Space or click Continue to start.";
     showScreen("trial");
+    // v5.2: brief read delay before the intro can be dismissed (Space and the Continue button both locked)
+    const introSecs = (adminMode || CONFIG.READ_DELAY_SCALE <= 0) ? 0 : Math.max(1, Math.round((spec.practiceIntro ? 5 : 3) * CONFIG.READ_DELAY_SCALE));
+    const introBtn = $("btn-intro-continue");
+    if (introSecs > 0) {
+      spec._locked = true;
+      startReadCountdown(introBtn, introSecs, "block_intro", () => { spec._locked = false; introBtn.disabled = false; });
+    } else { spec._locked = false; introBtn.disabled = false; }
     const markIntro = () => {
       if (currentEvent !== spec) return;
       spec._shownPerf = performance.now();
@@ -1076,7 +1141,7 @@
   }
   function dismissIntro() {
     const spec = currentEvent;
-    if (!spec || spec.kind !== "blockIntro") return;
+    if (!spec || spec.kind !== "blockIntro" || spec._locked) return;
     pushMarker("instruction_dismissed", { condition: spec.condition, block: spec.block, destination: spec.destination || "",
       viewing_ms: Math.round(performance.now() - (spec._shownPerf || performance.now())) });
     $("probe-placeholder").classList.remove("intro");
@@ -1328,6 +1393,43 @@
   }
 
   /**
+   * v5.2: "leave" half after a recall probe. The probe screen has no corridor to walk out of, so cover the screen
+   * with the same overlay the other styles end on; the next intersection then plays the normal arrival (playEnterTransition).
+   */
+  async function playProbeExitTransition() {
+    const style = currentTransStyle();
+    entryTransStyle = style;
+    const next = peekNextEvent();
+    const preload = await ensureEventAssets(next);
+    setProbeUI(false);
+    choiceEnabled = false;
+    if (CONFIG.TRANS_MS === 0) {
+      fadeCovered = false;
+      transitionBusy = false;
+      const pad = 150 - preload.waited;
+      if (pad > 0) await sleep(pad);
+      return;
+    }
+    transitionBusy = true;
+    const t0 = performance.now();
+    const overlay = transOverlay();
+    if (overlay) overlay.classList.add("on");
+    logEvent("transition_start", { choice: "probe", phase: "out", transStyle: style, nextKind: next && next.kind || "", preload_wait_ms: preload.waited, after_probe: 1 });
+    if (style === "WI") {
+      setPanoBlur(0); setOverlayOpacity(0); setIrisOpen(1);
+      await animateIris(1, 0, 260, (u) => u * u);
+      setIrisOpen(0);
+    } else {
+      if (style === "A+") showIntersectionLabel(next);
+      await animateOverlay(0, 1, 260);
+      setOverlayOpacity(1);
+      if (style === "W") setPanoBlur(3.2);
+    }
+    fadeCovered = true;
+    logEvent("transition_end", { choice: "probe", elapsed_ms: Math.round(performance.now() - t0), phase: "out", preload_wait_ms: preload.waited, transStyle: style, after_probe: 1 });
+  }
+
+  /**
    * Entry half for the snapshotted style. Choice keys stay ignored until this resolves;
    * decision_onset is scheduled by the caller afterward (RT clock starts once fully visible).
    */
@@ -1433,7 +1535,7 @@
     currentEvent = spec;
     resetResponseState();
     if (decisionTimer) { clearTimeout(decisionTimer); decisionTimer = null; }
-    const label = spec.isPractice ? `Practice ${spec.trainingId}` : `Trial ${spec.trialIndex} of ${nTestDecisions}`;
+    const label = spec.isPractice ? `Practice ${spec.trainingId}${spec.practiceTiming === "untimed" ? " (no time limit)" : ""}` : `Trial ${spec.trialIndex} of ${nTestDecisions}`;
     $("trial-badge").textContent = label;
     $("trial-hint").textContent = spec.destination ? `Destination: ${spec.destination}` : "Drag to look · then press ← or →";
     $("decision-prompt").textContent = spec.prompt;
@@ -1550,6 +1652,7 @@
       trialType: "decision",
       trialIndex: ev.trialIndex,
       isPractice: !!ev.isPractice,
+      practiceTiming: ev.isPractice ? (ev.practiceTiming || "") : "",
       stimulusId: ev.renderId,
       conditionLabel: ev.condition + (ev.stimulusPlaceholder ? "_PLACEHOLDER" : ""),
       choice,
@@ -1597,6 +1700,7 @@
     Promise.resolve()
       .then(() => playExitTransition(walkDir))
       .catch((err) => { console.error("[transition]", err); clearTransitionVisuals(); })
+      .then(() => (ackTimer ? sleepUntilAckDone(CONFIG.RESPONSE_ACK_MS) : null)) // v5.1: only waits if the exit walk was shorter than the feedback (e.g. ?trans=0)
       .then(() => {
         if (currentEvent !== ev) return;
         resetResponseState();
@@ -1615,8 +1719,11 @@
     clearDecisionLimit();
     hideTimesUp();
     const responsePerf = performance.now();
+    lastResponsePerf = responsePerf;
     const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
+    if (CONFIG.RESPONSE_ACK_MS > 0) showResponseAck(choice, CONFIG.RESPONSE_ACK_MS); // after RT is stamped
     pushMarker("response", { choice, rt_ms, trialType: "decision", timedOut: 0 });
+    logEvent("response_ack", { kind: "decision", choice, ack_ms: CONFIG.RESPONSE_ACK_MS });
     const row = buildDecisionRow(ev, { choice, timedOut: false, responsePerf, decisionLimitHiddenMs: hiddenMs });
     session.trials.push(row);
     console.log("[trial]", row);
@@ -1680,7 +1787,10 @@
     $("btn-probe-right").disabled = true;
     const ev = currentEvent;
     const responsePerf = performance.now();
+    lastResponsePerf = responsePerf;
     const rt_ms = Math.round(responsePerf - decisionOnsetPerf);
+    if (CONFIG.PROBE_ACK_MS > 0) showResponseAck(choice, CONFIG.PROBE_ACK_MS); // after RT is stamped
+    logEvent("response_ack", { kind: "probe", choice, ack_ms: CONFIG.PROBE_ACK_MS });
     const referenced = session.trials.find((t) => t.trialType === "decision" && t.trialIndex === ev.referencedTrialIndex);
     const referencedTimedOut = !!(referenced && +referenced.timedOut === 1);
     const correct = referencedTimedOut ? null : (decisionChoicesByIndex[ev.referencedTrialIndex] || null);
@@ -1709,7 +1819,17 @@
     };
     session.trials.push(row);
     console.log("[probe]", row);
-    setTimeout(() => { resetResponseState(); advance(); }, 350);
+    setTimeout(async () => {
+      if (currentEvent !== ev) return;
+      const next = peekNextEvent();
+      if (next && next.kind === "decision") {
+        // v5.2: the next intersection arrives with the same animation as after a normal decision (it used to just pop in)
+        try { await playProbeExitTransition(); } catch (err) { console.error("[probe-transition]", err); clearTransitionVisuals(); }
+      }
+      if (currentEvent !== ev) return;
+      resetResponseState();
+      advance();
+    }, CONFIG.PROBE_ACK_MS);
   }
 
   function advance() {
@@ -1735,13 +1855,46 @@
   }
 
   /** a simple page with HTML body and buttons; resolves with the id of the button pressed */
+  /* v5.2: instruction pages get a short countdown before the primary button enables (scaled to text length, ~5-15 s). */
+  function readDelaySeconds(words) {
+    if (adminMode || CONFIG.READ_DELAY_SCALE <= 0 || words < 10) return 0;
+    return Math.max(1, Math.round(Math.min(15, Math.max(5, Math.ceil(words / 9))) * CONFIG.READ_DELAY_SCALE));
+  }
+  function wordCount(el) { return ((el && el.innerText) || "").trim().split(/\s+/).filter(Boolean).length; }
+  /** Disable `btn` for `secs` s with a small "available in N s" note placed before it. Returns a cancel fn. */
+  function startReadCountdown(btn, secs, label, onDone) {
+    const note = document.createElement("span");
+    note.className = "read-wait";
+    btn.parentNode.insertBefore(note, btn);
+    btn.disabled = true;
+    const t0 = performance.now();
+    let iv = null;
+    const finish = () => {
+      if (iv) { clearInterval(iv); iv = null; }
+      note.remove();
+      if (onDone) onDone(); else btn.disabled = false;
+    };
+    const tick = () => {
+      const left = Math.ceil(secs - (performance.now() - t0) / 1000);
+      if (left <= 0) { finish(); return; }
+      note.textContent = "Available in " + left + " s";
+    };
+    tick();
+    iv = setInterval(tick, 250);
+    logEvent("read_delay", { label: label || "", seconds: secs });
+    return () => { if (iv) { clearInterval(iv); iv = null; } note.remove(); };
+  }
+  const READ_NOTE = '<p class="read-note"><strong>Please read all instructions carefully.</strong></p>';
+
   function page(html, buttons, opts) {
     return new Promise((resolve) => {
       const o = opts || {};
       let settled = false;
+      let cancelCountdown = null;
       const done = (id) => {
         if (settled) return;
         settled = true;
+        if (cancelCountdown) cancelCountdown();
         if (typeof off === "function") off();
         resolve(id);
       };
@@ -1750,12 +1903,24 @@
         else if (kind === "skip") done("admin-skip");
         else if (kind === "withdraw") done("withdraw");
       });
-      pageHost().innerHTML = `<div class="page ${o.cls || ""}">${html}<div class="btn-row">` +
+      pageHost().innerHTML = `<div class="page ${o.cls || ""}">${html}${o.readNote ? READ_NOTE : ""}<div class="btn-row">` +
         buttons.map((b) => `<button type="button" data-btn="${b.id}" class="${b.cls || ""}" ${b.disabled ? "disabled" : ""}>${escapeHtml(b.label)}</button>`).join("") +
         `</div></div>`;
       showScreen("page");
-      if (o.onShow) o.onShow(pageHost());
-      pageHost().querySelectorAll("button[data-btn]").forEach((el) => el.addEventListener("click", () => {
+      const host = pageHost();
+      host.__readLocked = false;
+      const primary = host.querySelector("button[data-btn]:not(.secondary):not(.ghost)");
+      const secs = (o.noReadDelay || !primary) ? 0 : (o.readSeconds != null ? o.readSeconds : readDelaySeconds(wordCount(host.querySelector(".page"))));
+      if (secs > 0) {
+        host.__readLocked = true;
+        cancelCountdown = startReadCountdown(primary, secs, currentPhase, () => {
+          host.__readLocked = false;
+          if (o.onReadDone) o.onReadDone(host); else primary.disabled = false;
+        });
+      }
+      if (o.onShow) o.onShow(host);
+      host.querySelectorAll("button[data-btn]").forEach((el) => el.addEventListener("click", () => {
+        if (el.disabled) return;
         if (o.validate && !o.validate(el.dataset.btn)) return;
         done(el.dataset.btn);
       }));
@@ -1931,7 +2096,7 @@
     logEvent("session_start", { participantIdSource: session.participantIdSource, seed: session.seed, dstSeed: session.dstSeed,
       conditionOrder: plan.order, conditionOrderSource: plan.orderSource, idBit: orderBit(session.participantId),
       idRandomPart: session.idRandomPart, adminMode: adminMode ? 1 : 0, transStyle: currentTransStyle(),
-      startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE,
+      startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE, responseAckMs: CONFIG.RESPONSE_ACK_MS, probeAckMs: CONFIG.PROBE_ACK_MS,
       showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION,
       decisionLimitMs: liveDecisionLimitMs,
@@ -1998,19 +2163,18 @@
     await page(`
       <p class="kicker">Before you begin</p>
       <h2>Welcome</h2>
-      <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questionnaires about how you feel and how you find your way.</p>
+      <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questionnaires about yourself.</p>
       <p>The session has several parts:</p>
       <ul class="intro-list">
         <li>A short set of questions about how you feel today.</li>
         <li>A few practice intersections so you can get used to the controls.</li>
-        <li>Two short, timed arithmetic checks, one before each wayfinding part.</li>
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
-      <p>You will go through a series of intersections, and at each one you will be asked to select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection." : ""} Please try to make your decision as soon as you can, while still trying to be accurate.${nearby}</p>
+      <p>You will go through a series of intersections, and at each one you must select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection." : ""} Please try to make your decision <strong>as soon as</strong> you can, while still trying to be <strong>accurate</strong>.${nearby}</p>
       <p class="privacy-note"><strong>Nothing that identifies you is collected. You are known in the data only by a study code.</strong></p>
       ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}) — confirm before use.</p>` : ""}`,
-      [{ id: "go", label: "Continue" }]);
+      [{ id: "go", label: "Continue" }], { readNote: true });
     logEvent("intro_dismissed", { viewing_ms: Math.round(performance.now() - t0) });
   }
 
@@ -2035,6 +2199,7 @@
       ],
       {
         cls: "consent-page",
+        onReadDone: (h) => { if (h.__sync) h.__sync(); },
         onShow: (h) => {
           const cb = h.querySelector("#age-confirm");
           const agree = h.querySelector('button[data-btn="agree"]');
@@ -2042,8 +2207,9 @@
           const sync = () => {
             if (!agree) return;
             if (adminMode) { agree.disabled = false; return; }
-            agree.disabled = !(cb && cb.checked);
+            agree.disabled = !!h.__readLocked || !(cb && cb.checked);
           };
+          h.__sync = sync;
           sync();
           if (cb) cb.addEventListener("change", () => { if (err) err.hidden = true; sync(); });
         },
@@ -2128,6 +2294,8 @@
       if (st) { st.textContent = ""; st.hidden = true; }
       btn.textContent = "Start practice";
       btn.disabled = false;
+      const rs = readDelaySeconds(wordCount($("screen-instructions")));
+      if (rs > 0) startReadCountdown(btn, rs, "task_instructions"); // v5.2: read first, then the button enables
     } catch (err) {
       if (st) {
         st.hidden = false;
@@ -2297,13 +2465,13 @@
   async function stepDebrief() {
     const copy = (window.WFStress && window.WFStress.DEBRIEF_COPY) || { title: "Debriefing", html: "<p>[PLACEHOLDER: IRB-approved debrief text.]</p>" };
     setPhase("debrief");
+    // v5.2: no "Exclude my data" option here (participants have already consented).
     const btn = await page(`<h2>${copy.title}</h2>${copy.html}`, [
       { id: "go", label: "Continue" },
-      { id: "exclude", label: "Exclude my data", cls: "secondary" },
     ], { cls: "debrief-page" });
-    if (btn === "exclude" || btn === "withdraw") {
+    if (btn === "withdraw") {
       session.excludeFromAnalysis = 1;
-      session.exclusionRequested = session.exclusionRequested || (btn === "exclude" ? "debrief" : "withdraw");
+      session.exclusionRequested = session.exclusionRequested || "withdraw";
       logEvent("data_exclusion_requested", { at: "debrief", via: btn });
       pendingWithdraw = false;
     } else {
@@ -2311,6 +2479,7 @@
     }
     session.stress.debriefShown = true;
     logEvent("debrief_shown", { wordingVersion: CONFIG.WORDING_VERSION, stressMode: CONFIG.STRESS_MODE });
+    showEndView("loading"); // v5.2: saving/computing takes a moment, so show a loading screen straight away
     // Await so this checkpoint cannot race/overwrite the final "complete" save on Drive.
     await autosave("debrief");
   }
@@ -2403,15 +2572,20 @@
     return list;
   }
 
-  /** Build Part 1 / Part 2 HTML cards (no condition names shown) and ensure summaries are stored. */
+  /** v5.2 compact results: 4 small boxes (overall, both parts). Summaries are still stored per condition/block for the raw data. */
+  function compactResultsHTML(stats) {
+    const box = (val, lbl) => `<div class="perf-stat"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`;
+    const nd = stats.n_decisions;
+    return `<div class="perf-stats compact">` +
+      box(nd ? stats.pct_correct + "%" : "—", "Correct direction choices<br>" + fmtCount(stats.n_correct, nd, null)) +
+      box(nd ? stats.pct_timeouts + "%" : "—", "Timed out<br>" + fmtCount(stats.n_timeouts, nd, null)) +
+      box(fmtLatency(stats.mean_decision_latency_s), "Average decision time<br>(answered intersections)") +
+      box(stats.n_probes ? stats.pct_probes_correct + "%" : "—", "Recall questions correct<br>" + fmtCount(stats.n_probes_correct, stats.n_probes, null)) +
+      `</div>`;
+  }
   function collectSummaries(conds) {
-    const list = ensureSummaries(conds);
-    const nParts = list.length;
-    return list.map((cond, i) => {
-      const stats = session.summaries.find((s) => s.scope === "condition" && s.condition === cond && s.conditionPosition === i + 1)
-        || conditionPerformance(cond, i + 1);
-      return performanceCardHTML(stats, i + 1, nParts);
-    }).join("");
+    ensureSummaries(conds);
+    return compactResultsHTML(session.summaries.find((x) => x.scope === "overall") || overallPerformance());
   }
 
   async function stepCondition(c, pos, later, nParts) {
@@ -2419,8 +2593,8 @@
     skipConditionFlag = false;
     setPhase(`condition_${pos === 1 ? "A" : "B"}`, { condition: c.condition, conditionName: COND_LABEL[c.condition] });
     await page(`<h2>Part ${pos} of ${parts}</h2>
-      <p>In this part you will find your way to three destinations in the hospital, one after another.
-      Before each destination you will see a short instruction.</p>`, [{ id: "go", label: "Continue" }]);
+      <p>In this part you will find your way to <strong>three destinations</strong> in the hospital, one after another. Before each destination you will see a short instruction.</p>
+      <p>Each destination takes about <strong>1 minute</strong>.</p>`, [{ id: "go", label: "Continue" }], { readNote: true });
     throwIfAbort();
     logEvent("condition_onset", { condition: c.condition, conditionPosition: pos });
     const blocks = splitQueueByBlocks(c.queue);
@@ -2642,7 +2816,47 @@
     return seen;
   }
 
+  /* v5.2 end flow: loading screen -> compact results -> Continue -> final "saved" page */
+  const END_VIEWS = ["loading", "results", "final"];
+  function showEndView(name) {
+    const scr = $("screen-end");
+    if (scr) scr.dataset.view = name;
+    END_VIEWS.forEach((v) => { const el = $("end-" + v + "-view"); if (el) el.hidden = v !== name; });
+    showScreen("end");
+  }
   function finishSession(reason) {
+    return finishSessionAsync(reason).catch((err) => {
+      console.error("[finish]", err);
+      logEvent("finish_error", { message: String(err && err.message || err) });
+      try { renderFinalView(reason, null); } catch (e2) { console.error(e2); }
+    });
+  }
+  function renderFinalView(reason, res, demo) {
+    const thanks = reason === "completed" ? "Thank you, the session is complete." :
+      reason === "consent_declined" ? "You chose not to take part. Thank you for your time." :
+      reason === "withdrawn" ? "You have withdrawn from the study. Thank you for your time." :
+      reason === "ineligible_under18" ? "You need to be 18 or older to take part. Thank you for your interest." :
+      "Thank you. The session has ended.";
+    $("end-thanks").textContent = thanks;
+    const h = $("end-final-title");
+    if (h) h.innerHTML = reason === "completed" ? "Session <em>complete</em>" : "Session <em>ended</em>";
+    const status = $("end-save-status"), row = $("end-fallback-row");
+    if (demo) {
+      status.className = "save-status";
+      status.textContent = "Demo mode — responses were not saved to Drive. Turn on “Save to Drive” if you need a copy.";
+      if (row) row.hidden = true;
+    } else if (res && res.ok) {
+      status.className = "save-status ok";
+      status.textContent = res.unconfirmed ? "Your responses were sent. You may close this window." : "Your responses were saved. You may close this window.";
+      if (row) row.hidden = true;
+    } else {
+      status.className = "save-status failed";
+      status.textContent = "Your responses could not be saved automatically. Please click the button below to download a copy of your data, and send it to the study team.";
+      if (row) row.hidden = false;
+    }
+    showEndView("final");
+  }
+  async function finishSessionAsync(reason) {
     setPhase("end");
     withdrawArmed = false;
     setWithdrawVisible(false);
@@ -2650,38 +2864,21 @@
     session.endReason = reason;
     if (reason === "withdrawn" || reason === "ineligible_under18") session.excludeFromAnalysis = 1;
     logEvent("session_end", { reason, excludeFromAnalysis: session.excludeFromAnalysis ? 1 : 0 });
+    const loadStart = performance.now();
+    showEndView("loading");
     const decisions = session.trials.filter((t) => t.trialType === "decision" && !t.isPractice);
     const probes = session.trials.filter((t) => t.trialType === "recall_probe");
     const nAcc = decisions.filter((t) => t.accuracy === 1).length;
     const meanRt = decisions.length ? Math.round(decisions.reduce((s, t) => s + t.rt_ms, 0) / decisions.length) : 0;
     const nProbeAcc = probes.filter((t) => t.accuracy === 1).length;
-    const thanks = reason === "completed" ? "Thank you, the session is complete." :
-      reason === "consent_declined" ? "You chose not to take part. Thank you for your time." :
-      reason === "withdrawn" ? "You have withdrawn from the study. Thank you for your time." :
-      reason === "ineligible_under18" ? "You need to be 18 or older to take part. Thank you for your interest." :
-      "Thank you. The session has ended.";
-    $("end-thanks").textContent = thanks;
-    const endH2 = document.querySelector("#end-participant h2");
-    if (endH2) endH2.innerHTML = reason === "completed" ? "Session <em>complete</em>" : "Session <em>ended</em>";
 
-    const debrief = $("end-debrief");
-    const results = $("end-results");
-    if (debrief) {
-      // The full MIST/IRB debrief is its own screen (stepDebrief), shown before these results.
-      debrief.innerHTML = "";
-    }
     // Always compute & store summaries (overall + per condition + per block) before the final save,
-    // even if the on-screen cards are hidden.
+    // even if the on-screen boxes are hidden.
     const conds = condsFromPlan();
-    ensureSummaries(conds);
-    if (results) {
-      if (CONFIG.SHOW_SUMMARY && reason === "completed" && decisions.length) {
-        results.innerHTML = collectSummaries(conds);
-        logEvent("performance_summary_shown", { at: "end", nParts: conds.length, nSummaryRows: session.summaries.length });
-      } else {
-        results.innerHTML = "";
-        logEvent("performance_summary_stored", { at: "end", shown: 0, nSummaryRows: session.summaries.length });
-      }
+    try { ensureSummaries(conds); } catch (err) { console.error("[summary]", err); logEvent("summary_error", { message: String(err && err.message || err) }); }
+    let resultsHtml = "";
+    if (CONFIG.SHOW_SUMMARY && reason === "completed" && decisions.length) {
+      try { resultsHtml = collectSummaries(conds); } catch (err) { console.error("[summary]", err); logEvent("summary_error", { message: String(err && err.message || err) }); }
     }
 
     const exp = $("end-experimenter");
@@ -2693,43 +2890,32 @@
       <div><strong>Test decisions:</strong> ${decisions.length} · accuracy ${nAcc}/${decisions.length} · mean RT ${meanRt} ms</div>
       <div><strong>Recall probes:</strong> ${probes.length} · accuracy ${nProbeAcc}/${probes.length}</div>
       <div><strong>Questionnaire items:</strong> ${session.responses.length} · administrations ${session.scores.length}</div>
-      <div><strong>Summaries:</strong> ${session.summaries.length} rows · completedAt <code>${escapeHtml(session.completedAt || "")}</code></div>
-      <div><strong>Stress:</strong> mode <code>${CONFIG.STRESS_MODE}</code> · DST items ${(session.stress.dst && session.stress.dst.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · MIST items ${((session.stress.mist && session.stress.mist.practice && session.stress.mist.practice.responses) || []).length + (session.stress.mist && session.stress.mist.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · preps ${session.stress.preps.length} · live answers ${(session.stress.live && session.stress.live.responses || []).length} · end-math answers ${(session.stress.endMath && session.stress.endMath.responses || []).length} · events ${session.events.length}</div>`;
+      <div><strong>Summaries:</strong> ${(session.summaries || []).length} rows · completedAt <code>${escapeHtml(session.completedAt || "")}</code></div>
+      <div><strong>Stress:</strong> mode <code>${CONFIG.STRESS_MODE}</code> · DST items ${(session.stress.dst && session.stress.dst.segments || []).reduce((n, s) => n + ((s.responses || []).length), 0)} · events ${session.events.length}</div>`;
       if ($("log-preview")) $("log-preview").value = JSON.stringify(session, null, 2);
     }
-    showScreen("end");
-    const status = $("end-save-status");
-    const row = $("end-fallback-row");
-    if (adminMode && !adminSavesOn) {
-      if (status) {
-        status.className = "save-status";
-        status.textContent = "Demo mode — responses were not saved to Drive. Turn on “Save to Drive” if you need a copy.";
-      }
-      if (row) row.hidden = true;
-      Promise.resolve(autosave("complete"));
-      return;
-    }
-    if (status) { status.className = "save-status"; status.textContent = "Saving your responses…"; }
+
     // Final Drive/local save: reason "complete" with completedAt, endReason, and summaries populated.
-    Promise.resolve(autosave("complete")).then((res) => {
-      const confirmed = !!(res && res.ok && !res.unconfirmed);
-      if (res && res.ok) {
-        if (status) {
-          status.className = "save-status ok";
-          status.textContent = res.unconfirmed
-            ? "Your responses were sent. You may close this window."
-            : "Your responses were saved. You may close this window.";
-        }
-        if (row) row.hidden = true;
-        if (confirmed) clearStudyStorage();
-      } else {
-        if (status) {
-          status.className = "save-status failed";
-          status.textContent = "Your responses could not be saved automatically. Please click the button below to download a copy of your data.";
-        }
-        if (row) row.hidden = false;
-      }
-    });
+    const demo = adminMode && !adminSavesOn;
+    let res = null;
+    try { res = await autosave("complete"); } catch (err) { console.error("[save]", err); res = { ok: false, error: String(err && err.message || err) }; }
+    if (!demo && res && res.ok && !res.unconfirmed) clearStudyStorage();
+    // keep the loading screen up for at least ~1.5 s so it never just flashes
+    const minLoad = adminMode ? 0 : CONFIG.END_MIN_LOAD_MS;
+    const left = minLoad - (performance.now() - loadStart);
+    if (left > 0) await sleep(left);
+
+    if (resultsHtml) {
+      $("end-results").innerHTML = resultsHtml;
+      logEvent("performance_summary_shown", { at: "end", nBoxes: 4, nSummaryRows: (session.summaries || []).length });
+      showEndView("results");
+      await new Promise((resolve) => { $("btn-end-continue").addEventListener("click", resolve, { once: true }); });
+      logEvent("results_continue", {});
+    } else {
+      $("end-results").innerHTML = "";
+      logEvent("performance_summary_stored", { at: "end", shown: 0, nSummaryRows: (session.summaries || []).length });
+    }
+    renderFinalView(reason, res, demo);
   }
 
   function downloadBlob(filename, text, mime) {
@@ -2769,6 +2955,13 @@
       if (k === " " || k === "enter") { e.preventDefault(); dismissIntro(); }
       return;
     }
+    // v5.1: a second left/right press after a response was registered is ignored (first press counts) and logged
+    if ((k === "arrowleft" || k === "a" || k === "arrowright" || k === "d") && responding &&
+        (currentEvent.kind === "decision" || currentEvent.kind === "probe")) {
+      e.preventDefault();
+      if (!e.repeat) logEvent("response_ignored", { kind: currentEvent.kind, key: e.key, ms_after_response: Math.round(performance.now() - lastResponsePerf) });
+      return;
+    }
     // Ignore left/right during the corridor exit+entry (RT for the new trial starts only after entry).
     if (transitionBusy || fadeCovered) return;
     if (!choiceEnabled) return;
@@ -2796,7 +2989,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v5.0 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.2 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -2846,7 +3039,7 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v5.0] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v5.2] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,

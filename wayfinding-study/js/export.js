@@ -1,5 +1,5 @@
 /**
- * v5.0 data export. Pure functions (no DOM), shared by the app (window.WF_EXPORT) and the node test (module.exports).
+ * v5.0 data export (v5.2: DEM_occupation no longer collected; sleep hours / age exported from dropdowns, sleep "More than 14" = 15). Pure functions (no DOM), shared by the app (window.WF_EXPORT) and the node test (module.exports).
  *
  * Per participant the export is:
  *   <pid>_questionnaires.csv   long format, one row per questionnaire timepoint (13 rows in a complete session)
@@ -58,7 +58,7 @@
   const pad2 = (n) => String(n).padStart(2, "0");
   const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
 
-  const DEM_IDS = ["DEM_age", "DEM_gender", "DEM_education", "DEM_occupation", "DEM_race", "DEM_english",
+  const DEM_IDS = ["DEM_age", "DEM_gender", "DEM_education", "DEM_race", "DEM_english",
     "DEM_hospfamiliar", "DEM_hospvisits", "DEM_healthcarework", "DEM_videogames", "DEM_vrexp", "DEM_nature"];
   const DEM_OTHER = ["DEM_gender", "DEM_race", "DEM_english"]; // choices that offer a free-text "other"
 

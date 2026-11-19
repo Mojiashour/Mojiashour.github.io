@@ -132,6 +132,12 @@
           if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change")); }
           if (state[name]) state[name].other = el.value;
         }));
+        host.querySelectorAll("select.sel").forEach((el) => el.addEventListener("change", () => {
+          const it = itemById[el.name];
+          if (el.value === "") { delete state[el.name]; return; }
+          const v = typed(it, el.value);
+          touch(el.name, v, optLabel(it, v));
+        }));
         host.querySelectorAll("input.num, input.txt").forEach((el) => el.addEventListener("input", () => {
           const v = el.classList.contains("num") ? (el.value === "" ? "" : +el.value) : el.value.trim();
           if (v === "") { delete state[el.name]; return; }
@@ -179,6 +185,9 @@
               thumb.style.left = (v / 100) * 100 + "%";
               box.classList.remove("untouched");
             }
+          } else if (it.type === "select") {
+            const el = host.querySelector(`select[name="${it.id}"]`);
+            if (el) el.value = String(s.value);
           } else if (it.type === "number" || it.type === "text") {
             const el = host.querySelector(`input[name="${it.id}"]`);
             if (s.value === "pna" && it.allowPna) {
@@ -215,8 +224,9 @@
         let html = `<div class="survey" data-instrument="${inst.id}" data-page="${pageI + 1}" data-pages="${pages.length}">
           <div class="survey-head">
           <p class="kicker">Questionnaire</p>
-          <h2>${esc(inst.title)}</h2>
-          <p class="survey-instr">${instr}</p></div>`;
+          ${inst.heading ? `<h2>${esc(inst.heading)}</h2>` : ""}
+          <p class="survey-instr${inst.heading ? "" : " lead"}">${instr}</p>
+          ${inst.timeframe ? `<p class="survey-timeframe">${esc(inst.timeframe)}</p>` : ""}</div>`;
 
         // Group this page's items by section so headings appear when needed
         const bySec = [];
@@ -239,10 +249,21 @@
                 sec.options.map((o) => `<td><label class="cell"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"></label></td>`).join("") + "</tr>";
               return;
             }
-            html += `<div class="q" data-item="${it.id}"><div class="qtext">${it.type === "sam" ? "" : num} ${esc(it.text)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`;
+            html += `<div class="q" data-item="${it.id}">` + (it.hideText ? "" : `<div class="qtext">${it.type === "sam" ? "" : num} ${esc(it.text)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`);
             if (it.hint) html += `<div class="qhint">${esc(it.hint)}</div>`;
             const opts = it.options || sec.options;
-            if (it.type === "choice" || it.type === "multi") {
+            if (it.type === "choice" && it.display === "hscale") {
+              // v5.2: horizontal 1-N scale with endpoint labels; "prefer not to answer" is a separate option below
+              const pts = opts.filter((o) => o.v !== "pna"), pna = opts.find((o) => o.v === "pna");
+              html += `<div class="hscale"><span class="hs-end">${esc(it.endLabels[0])}</span><div class="hs-pts">` + pts.map((o) =>
+                `<label class="hs-pt"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"><span>${esc(o.label)}</span></label>`).join("") +
+                `</div><span class="hs-end">${esc(it.endLabels[1])}</span></div>` +
+                (pna ? `<div class="hs-pna"><label class="opt"><input type="radio" name="${it.id}" value="pna"> <span>${esc(pna.label)}</span></label></div>` : "");
+            } else if (it.type === "select") {
+              html += `<div class="opts"><select class="sel" name="${it.id}" aria-label="${esc(it.text)}"><option value="">Select…</option>` +
+                opts.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join("") + `</select>` +
+                (it.unit ? ` <span class="unit">${esc(it.unit)}</span>` : "") + `</div>`;
+            } else if (it.type === "choice" || it.type === "multi") {
               html += `<div class="opts ${opts.length > 5 || opts.some((o) => o.label.length > 22) ? "opts-col" : ""}">` + opts.map((o) =>
                 `<label class="opt"><input type="${it.type === "multi" ? "checkbox" : "radio"}" name="${it.id}" value="${esc(o.v)}" ${o.exclusive ? 'data-exclusive="1"' : ""}> <span>${esc(o.label)}</span>` +
                 (o.other ? ` <input type="text" class="other" data-other-for="${it.id}" data-opt="${esc(o.v)}" maxlength="80" autocomplete="off">` : "") + `</label>`).join("") + `</div>`;
@@ -253,7 +274,7 @@
                 (it.allowPna ? ` <label class="opt pna-opt"><input type="checkbox" class="pna-toggle" data-pna-for="${it.id}"> <span>I prefer not to answer</span></label>` : "") +
                 `</div>`;
             } else if (it.type === "vas") {
-              html += `<p class="vas-prompt">Click on the line to place your rating.</p>
+              html += `<p class="vas-prompt">Click on the line and drag to indicate your rating</p>
                 <div class="vas untouched" data-vas="${it.id}"><div class="vas-track" role="slider" aria-label="${esc(it.text)}" aria-valuemin="0" aria-valuemax="100"><div class="vas-thumb"></div></div>
                 <div class="vas-ends"><span>${esc(it.left)}</span><span>${esc(it.right)}</span></div></div>`;
             } else if (it.type === "sam") {
@@ -375,6 +396,10 @@
     names.forEach((n) => {
       const opts = Array.from(host.querySelectorAll(`input[name="${n}"]`)).filter((o) => !o.dataset.exclusive);
       const o = opts[Math.floor(r() * opts.length)] || Array.from(host.querySelectorAll(`input[name="${n}"]`))[0]; if (!o) return; o.checked = true; o.dispatchEvent(new Event("change"));
+    });
+    host.querySelectorAll("select.sel").forEach((el) => {
+      const opts = Array.from(el.options).filter((o) => o.value !== "");
+      el.value = opts[Math.floor(r() * opts.length)].value; el.dispatchEvent(new Event("change"));
     });
     host.querySelectorAll("input.num").forEach((el) => { el.value = el.min && +el.min > 1 ? 25 : 7; el.dispatchEvent(new Event("input")); });
     host.querySelectorAll("input.txt").forEach((el) => { el.value = "test field"; el.dispatchEvent(new Event("input")); });

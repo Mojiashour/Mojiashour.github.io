@@ -4,9 +4,9 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v5.0</title>
-  <link rel="stylesheet" href="assets/fonts/fonts.css" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <title>Wayfinding Study v5.2</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css?v=52" />
+  <link rel="stylesheet" href="css/styles.css?v=52" />
 </head>
 <body>
   <div id="lab-banner" role="status">LAB MODE — markers stub</div>
@@ -56,7 +56,7 @@
 
   <header class="app-bar">
     <div class="study-wordmark">Hospital Wayfinding Study</div>
-    <h1>Hospital Wayfinding · v5.0</h1>
+    <h1>Hospital Wayfinding · v5.2</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
   <button type="button" id="btn-withdraw" class="withdraw-link" hidden>Withdraw</button>
@@ -81,11 +81,12 @@
             <div class="key-combo"><kbd class="key-cap">→</kbd><span>Right</span></div>
           </div>
         </li>
-        <li>Please make your selection (right or left) as soon as you can.</li>
-        <li id="instr-decision-limit">You will have <strong>3 seconds</strong> to choose a direction at each intersection. If you do not choose within 3 seconds, a “Time’s up” message appears and the study moves on to the next intersection.</li>
+        <li>Please make your selection (right or left) <strong>as soon as you can</strong>.</li>
+        <li id="instr-decision-limit">In the task you <strong>must</strong> choose a direction within <strong>3 seconds</strong>. If you do not, a “Time’s up” message appears and the study moves on to the next intersection.</li>
         <li>Please stay focused.</li>
         <li>This is a serious data collection effort. Do not close this window or switch to another window during the experiment.</li>
       </ol>
+      <p class="read-note"><strong>Please read all instructions carefully.</strong></p>
       <p class="hint protocol-warn" id="preload-status" hidden></p>
       <div class="btn-row">
         <button type="button" id="btn-to-practice" disabled>Loading…</button>
@@ -118,6 +119,7 @@
               <span class="decision-timer-num" id="decision-timer-num" aria-hidden="true">3</span>
             </div>
             <div id="times-up" class="times-up" hidden aria-live="polite" aria-hidden="true"><span>Time’s up</span></div>
+            <div id="response-ack" class="response-ack" hidden aria-live="polite"><span id="response-ack-text"></span></div>
             <div id="intersection-label" class="intersection-label" hidden></div>
             <div id="probe-placeholder" class="probe-placeholder" hidden aria-hidden="true">
               <span id="placeholder-text" class="placeholder-text">Recall probe</span>
@@ -162,14 +164,27 @@
     <!-- End: participant results / debrief, plus experimenter tools when in lab or debug -->
     <section id="screen-end" class="screen participant-end" aria-label="Session complete">
       <div id="end-participant">
-        <p class="kicker">Session</p>
-        <h2>Session <em>complete</em></h2>
-        <p id="end-thanks">Thank you.</p>
-        <div id="end-debrief" class="debrief-block"></div>
-        <div id="end-results"></div>
-        <p id="end-save-status" class="save-status"></p>
-        <div class="btn-row" id="end-fallback-row" hidden>
-          <button type="button" id="btn-fallback-download">Download your data</button>
+        <!-- v5.2: loading screen -> compact results -> Continue -> final saved page -->
+        <div id="end-loading-view" class="end-view" hidden>
+          <div class="end-spinner" role="status" aria-label="Loading"></div>
+          <h2>Loading your <em>results</em>…</h2>
+          <p>Please wait a moment and keep this window open.</p>
+        </div>
+        <div id="end-results-view" class="end-view" hidden>
+          <p class="kicker">Your results</p>
+          <h2>Your <em>results</em></h2>
+          <p class="end-lead">A summary of your wayfinding performance. These numbers are from your own responses only. Timeouts count as incorrect direction choices.</p>
+          <div id="end-results"></div>
+          <p class="results-photo"><strong>Feel free to take a screenshot or a photo of your results!</strong></p>
+          <div class="btn-row"><button type="button" id="btn-end-continue">Continue</button></div>
+        </div>
+        <div id="end-final-view" class="end-view" hidden>
+          <h2 id="end-final-title">Session <em>complete</em></h2>
+          <p id="end-thanks">Thank you.</p>
+          <p id="end-save-status" class="save-status"></p>
+          <div class="btn-row" id="end-fallback-row" hidden>
+            <button type="button" id="btn-fallback-download">Download your data</button>
+          </div>
         </div>
       </div>
       <div id="end-experimenter" hidden>
@@ -191,14 +206,14 @@
     </section>
   </main>
 
-  <script src="js/stimuli.js"></script>
-  <script src="js/instruments.js"></script>
-  <script src="js/survey.js"></script>
-  <script src="js/stress.js"></script>
-  <script src="js/consent_copy.js"></script>
-  <script src="js/export.js"></script>
-  <script src="js/backend.js"></script>
-  <script type="module" src="js/pano3d.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/stimuli.js?v=52"></script>
+  <script src="js/instruments.js?v=52"></script>
+  <script src="js/survey.js?v=52"></script>
+  <script src="js/stress.js?v=52"></script>
+  <script src="js/consent_copy.js?v=52"></script>
+  <script src="js/export.js?v=52"></script>
+  <script src="js/backend.js?v=52"></script>
+  <script type="module" src="js/pano3d.js?v=52"></script>
+  <script src="js/app.js?v=52"></script>
 </body>
 </html>

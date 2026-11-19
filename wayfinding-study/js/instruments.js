@@ -24,15 +24,20 @@
   const scale = (labels, start = 1) => labels.map((l, i) => ({ v: start + i, label: l }));
 
   const I = {};
+  // v5.2: dropdown option builders. Values stay numeric (export/analysis unchanged).
+  const rangeOpts = (lo, hi, step) => { const o = []; for (let v = lo; v <= hi + 1e-9; v += step) o.push({ v: Math.round(v * 10) / 10, label: String(Math.round(v * 10) / 10) }); return o; };
 
   // Eligibility items SCR01–SCR13 and SCR18 were dropped in v4.2 (web-only study, no EEG).
   // Item wording of SCR14–SCR17 is unchanged from the docx.
   I.TODAY = {
     id: "TODAY", title: "Today's state", ref: "Developed for this study.",
     instructions: "Please answer the following questions about how you are today.",
+    emphasize: ["today"],
     required: true,
     sections: [{ items: [
-      { id: "SCR14", text: "How many hours did you sleep last night?", type: "number", min: 0, max: 24, step: 0.5, unit: "hours" },
+      // v5.2: dropdown, 0-14 h in 0.5 h steps + "More than 14" (stored as 15; documented in the data dictionary)
+      { id: "SCR14", text: "How many hours did you sleep last night?", type: "select", unit: "hours",
+        options: rangeOpts(0, 14, 0.5).concat([{ v: 15, label: "More than 14" }]) },
       { id: "SCR15", text: "How long ago did you last have caffeine (coffee, tea, energy drink)?", type: "choice",
         options: scale(["None today", "Less than 1 hour", "1–3 hours", "More than 3 hours"]) },
       { id: "SCR16", text: "Have you used nicotine in the past 2 hours?", type: "choice", options: yn },
@@ -42,10 +47,11 @@
 
   I.VAS = {
     id: "VAS", title: "Stress Visual Analogue Scale", ref: "Lesage, Berjot & Deschamps (2012), Occup Med 62(8), 600–605.",
-    instructions: 'Please rate your current level of stress by moving the slider. The left end represents "No stress at all" and the right end represents "Maximum stress imaginable."',
-    emphasize: ["current"],
+    heading: "Your stress level, right now",
+    instructions: "Please rate how stressed you feel right now.",
+    emphasize: ["right now"],
     required: true,
-    sections: [{ items: [{ id: "VAS_stress", text: "How stressed do you feel right now?", type: "vas",
+    sections: [{ items: [{ id: "VAS_stress", text: "How stressed do you feel right now?", type: "vas", hideText: true,
       left: "No stress at all", right: "Maximum stress imaginable" }] }],
   };
 
@@ -53,16 +59,16 @@
 
   I.STICSA_S = {
     id: "STICSA_S", title: "STICSA – State", ref: "Ree, French, MacLeod & Locke (2008), Behav Cogn Psychother 36(3), 313–332.",
-    instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates how you feel right now, at this moment.",
-    emphasize: ["you feel right now, at this moment"],
+    instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates:",
+    timeframe: "How you feel right now, at this moment",
     required: true, layout: "matrix",
     sections: [{ options: scale(["Not at all", "A little", "Moderately", "Very much so"]),
       items: STICSA_ITEMS.map((t, i) => ({ id: "STS" + String(i + 1).padStart(2, "0"), text: t, type: "choice" })) }],
   };
   I.STICSA_T = {
     id: "STICSA_T", title: "STICSA – Trait", ref: I.STICSA_S.ref,
-    instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates how you generally feel, that is, how you feel most of the time.",
-    emphasize: ["most of the time"],
+    instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates:",
+    timeframe: "How you generally feel, that is, how you feel most of the time",
     required: true, layout: "matrix",
     sections: [{ options: scale(["Almost never", "Occasionally", "Often", "Almost always"]),
       items: STICSA_ITEMS.map((t, i) => ({ id: "STT" + String(i + 1).padStart(2, "0"), text: t, type: "choice" })) }],
@@ -134,25 +140,25 @@
         .map(([id, text]) => ({ id, text, type: "choice" })) }],
   };
 
-  // Non-identifying only: no name / DOB / contact fields. Item 4 (occupation/field) is the docx's open-text item;
-  // its hint asks participants not to enter names or other identifying details.
+  // Non-identifying only: no name / DOB / contact fields. v5.2: the open-text occupation/field item (old item 4) was removed.
   const PNA = { v: "pna", label: "I prefer not to answer" };
   const PNA_EX = { v: "pna", label: "I prefer not to answer", exclusive: true };
 
   I.DEMO = {
     id: "DEMO", title: "Demographics and Background", ref: "Developed for this study.",
+    heading: "About you",
     instructions: "Please answer each question about yourself. Age is required. For every other question, you may choose “I prefer not to answer.” Please do not enter names or other identifying details.",
     required: true,
     sections: [{ items: [
-      { id: "DEM_age", text: "What is your age? (years)", type: "number", min: 18, max: 110, step: 1, unit: "years", ineligibleBelowMin: true },
+      // v5.2: dropdown 18-99 (consent already confirms 18+); required
+      { id: "DEM_age", text: "What is your age? (years)", type: "select", options: rangeOpts(18, 99, 1) },
       { id: "DEM_gender", text: "What is your gender?", type: "choice",
         options: [{ v: "woman", label: "Woman" }, { v: "man", label: "Man" }, { v: "nonbinary", label: "Non-binary" },
           { v: "self", label: "Prefer to self-describe:", other: true }, PNA] },
       { id: "DEM_education", text: "What is the highest level of education you have completed?", type: "choice",
         options: [{ v: "hs", label: "High school or less" }, { v: "somecollege", label: "Some college" }, { v: "bachelor", label: "Bachelor's degree" },
           { v: "master", label: "Master's degree" }, { v: "doctoral", label: "Doctoral or professional degree" }, PNA] },
-      { id: "DEM_occupation", text: "What is your current occupation or field of study?", type: "text", allowPna: true,
-        hint: "General field only (e.g., \u201cengineering student\u201d). Please do not enter names or other identifying details." },
+      // v5.2: DEM_occupation (occupation / field of study, open text) removed.
       { id: "DEM_race", text: "What is your race/ethnicity? (select all that apply)", type: "multi",
         options: [{ v: "aian", label: "American Indian or Alaska Native" }, { v: "asian", label: "Asian" }, { v: "black", label: "Black or African American" },
           { v: "hispanic", label: "Hispanic or Latino" }, { v: "mena", label: "Middle Eastern or North African" },
@@ -161,7 +167,8 @@
       { id: "DEM_english", text: "Is English your first language?", type: "choice",
         options: [{ v: "yes", label: "Yes" }, { v: "no", label: "No (if no, please specify):", other: true }, PNA] },
       { id: "DEM_hospfamiliar", text: "How familiar are you with hospital environments?", type: "choice",
-        options: [1, 2, 3, 4, 5].map((v) => ({ v, label: v === 1 ? "1 Not at all familiar" : v === 5 ? "5 Extremely familiar" : String(v) })).concat([PNA]) },
+        display: "hscale", endLabels: ["Not at all familiar", "Extremely familiar"],
+        options: [1, 2, 3, 4, 5].map((v) => ({ v, label: String(v) })).concat([PNA]) },
       { id: "DEM_hospvisits", text: "How many times have you visited a hospital in the past 12 months?", type: "choice",
         options: [{ v: "0", label: "0" }, { v: "1-2", label: "1–2" }, { v: "3-5", label: "3–5" }, { v: ">5", label: "More than 5" }, PNA] },
       { id: "DEM_healthcarework", text: "Do you work or have you worked in a healthcare setting?", type: "choice",
