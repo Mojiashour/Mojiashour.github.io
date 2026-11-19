@@ -16,29 +16,29 @@
   "correct_side": "left",
   "congruence": "n/a",
   "target_row": 4,
-  "n_rows": 9,
-  "n_lines": 10,
-  "n_right_arrows": 5,
+  "n_rows": 10,
+  "n_lines": 11,
+  "n_right_arrows": 6,
   "n_left_arrows": 5,
   "extra_arrow_side": "none",
   "wayout_arrow": "right",
   "lines": [
    {
-    "text": "Blood Bank",
+    "text": "Library",
     "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Library",
+    "text": "Security",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Security",
+    "text": "Volunteers",
     "arrow": "right",
     "level": null,
     "is_target": false,
@@ -52,43 +52,50 @@
     "is_wayout": false
    },
    {
-    "text": "Social Work",
+    "text": "Interpreters",
     "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Volunteer Services",
+    "text": "Laundry",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Staff Lounge",
+    "text": "Cashier",
     "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Respiratory Therapy",
+    "text": "Transport",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Interpreter Services",
+    "text": "Auditorium",
     "arrow": "right",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Telephones",
+    "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
     "text": "Exit",
-    "arrow": "left",
+    "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": true
@@ -105,7 +112,7 @@
   "destination": "Admissions",
   "dest_level": "G",
   "header_level": "G",
-  "cell_no": 1,
+  "cell_no": 2,
   "cell_id": "TRN_T4_Admissions_corrR",
   "layout": "none",
   "cue_type": "none",
@@ -114,15 +121,15 @@
   "correct_side": "right",
   "congruence": "n/a",
   "target_row": 7,
-  "n_rows": 9,
-  "n_lines": 10,
-  "n_right_arrows": 5,
+  "n_rows": 10,
+  "n_lines": 11,
+  "n_right_arrows": 6,
   "n_left_arrows": 5,
   "extra_arrow_side": "none",
   "wayout_arrow": "right",
   "lines": [
    {
-    "text": "Library",
+    "text": "Interpreters",
     "arrow": "left",
     "level": null,
     "is_target": false,
@@ -136,28 +143,28 @@
     "is_wayout": false
    },
    {
-    "text": "Staff Lounge",
+    "text": "Transport",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Blood Bank",
+    "text": "Library",
     "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Respiratory Therapy",
+    "text": "Telephones",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Social Work",
+    "text": "Cashier",
     "arrow": "right",
     "level": null,
     "is_target": false,
@@ -171,15 +178,22 @@
     "is_wayout": false
    },
    {
-    "text": "Interpreter Services",
+    "text": "Volunteers",
     "arrow": "left",
     "level": null,
     "is_target": false,
     "is_wayout": false
    },
    {
-    "text": "Volunteer Services",
+    "text": "Auditorium",
     "arrow": "left",
+    "level": null,
+    "is_target": false,
+    "is_wayout": false
+   },
+   {
+    "text": "Laundry",
+    "arrow": "right",
     "level": null,
     "is_target": false,
     "is_wayout": false

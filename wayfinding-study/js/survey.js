@@ -374,7 +374,7 @@
     host.querySelectorAll("input[type=radio],input[type=checkbox]").forEach((el) => names.add(el.name));
     names.forEach((n) => {
       const opts = Array.from(host.querySelectorAll(`input[name="${n}"]`)).filter((o) => !o.dataset.exclusive);
-      const o = opts[Math.floor(r() * opts.length)]; o.checked = true; o.dispatchEvent(new Event("change"));
+      const o = opts[Math.floor(r() * opts.length)] || Array.from(host.querySelectorAll(`input[name="${n}"]`))[0]; if (!o) return; o.checked = true; o.dispatchEvent(new Event("change"));
     });
     host.querySelectorAll("input.num").forEach((el) => { el.value = el.min && +el.min > 1 ? 25 : 7; el.dispatchEvent(new Event("input")); });
     host.querySelectorAll("input.txt").forEach((el) => { el.value = "test field"; el.dispatchEvent(new Event("input")); });

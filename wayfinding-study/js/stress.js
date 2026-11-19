@@ -3,7 +3,7 @@
  *
  * Default: a DST-style timed math block adapted from Norden et al. (2022),
  * J Med Internet Res 24(7):e32280, with a fixed problem list and a fixed
- * per-item limit for every participant (see DST_LISTS / DST_DEFAULTS).
+ * per-item limit for every participant (see generateDstItems / DST_DEFAULTS; items generated per participant since v5.0).
  *
  *   WFStress.runDstAnticipation(host, cfg, onEvent)
  *   WFStress.runDstCountdown(host, cfg, onEvent)
@@ -898,11 +898,19 @@
    *   - no practice problems and no practice-based timing (Norden did not
    *     use a practice baseline; their timing started at a fixed 3 s)
    *
-   * Our choices (not a published item list):
-   *   - two fixed lists (A, B), identical for every participant, written
-   *     to match the paper's constraints. List A item 1 is 38 + 21, the
-   *     only DST arithmetic example visible in Figure 1 of the paper.
-   *     Every other item is ours (source: "study_list").
+   * v5.0: ITEMS ARE NOW GENERATED PER PARTICIPANT, as in Norden et al.
+   *   (the paper publishes no item list; problems are generated). Each
+   *   participant gets their own items from a logged seed (session.dstSeed;
+   *   the second block uses a seed derived from it), under the paper's
+   *   constraints: two numbers 1-99, operators + - x /, integer answers
+   *   1-99, division exact, operators mixed (a shuffled bag of the four
+   *   operators, so no operator dominates). One small, disclosed addition:
+   *   x and / never use the operand 1 (a x 1, a / 1 would be trivial).
+   *   See generateDstItems(). The old fixed lists A/B (DST_LISTS) are kept
+   *   below only as an unused fallback; every item logs list_id "generated"
+   *   and source "generated".
+   *
+   * Our other choices:
    *   - 20–30 s anticipatory screen, then "I'm ready", then the countdown
    *   - no camera, no speech, no random keypad, no "only serious results"
    *     line (the last per the study memo, for a student sample)
@@ -1220,6 +1228,39 @@
         if (el) el.textContent = String(remaining);
       }, 1000);
     });
+  }
+
+  /** v5.0: Norden et al.-style generated DST items. Deterministic for a given seed. */
+  function dstRng(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function generateDstItems(seed, n) {
+    const rnd = dstRng(seed >>> 0);
+    const ri = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1)); // inclusive
+    const make = {
+      "+": () => { const sum = ri(2, 99), a = ri(1, sum - 1); return { a, b: sum - a, answer: sum }; },
+      "\u2212": () => { const r = ri(1, 98), b = ri(1, 99 - r); return { a: r + b, b, answer: r }; },
+      "\u00d7": () => { let a = ri(2, 49), b = ri(2, Math.floor(99 / a)); if (rnd() < 0.5) { const t = a; a = b; b = t; } return { a, b, answer: a * b }; },
+      "\u00f7": () => { const q = ri(2, 49), b = ri(2, Math.floor(99 / q)); return { a: q * b, b, answer: q }; },
+    };
+    const ops = Object.keys(make);
+    const out = [];
+    let bag = [], prev = "";
+    while (out.length < n) {
+      if (!bag.length) { bag = ops.slice(); for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = bag[i]; bag[i] = bag[j]; bag[j] = t; } }
+      const op = bag.pop();
+      const it = make[op]();
+      const expr = it.a + " " + op + " " + it.b;
+      if (expr === prev) { bag.push(op); continue; }
+      prev = expr;
+      out.push({ idx: out.length + 1, a: it.a, b: it.b, op, expr, answer: it.answer, source: "generated" });
+    }
+    return out;
   }
 
   function runDst(host, cfg, onEvent) {
@@ -1542,7 +1583,7 @@
   window.WFStress = {
     run: run, runPrep: runPrep, runQuiet: runQuiet, runMist: runMist, skipCurrent: requestSkip,
     runDstAnticipation: runDstAnticipation, runDstCountdown: runDstCountdown, runDst: runDst,
-    dstSummaryHtml: dstSummaryHtml, DST_LISTS: DST_LISTS, DST_DEFAULTS: DST_DEFAULTS, DST_COPY: DST_COPY,
+    dstSummaryHtml: dstSummaryHtml, generateDstItems: generateDstItems, DST_LISTS: DST_LISTS, DST_DEFAULTS: DST_DEFAULTS, DST_COPY: DST_COPY,
     generateProblem: generateProblem, WORDING_VERSION: WORDING_VERSION,
     PREP_COPY: PREP_COPY, MIST_DEFAULTS: MIST_DEFAULTS, MIST_COPY: MIST_COPY,
     DEBRIEF_COPY: DEBRIEF_COPY,

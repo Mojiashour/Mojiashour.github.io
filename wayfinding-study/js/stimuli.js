@@ -1,4 +1,4 @@
-/* v4: signOverlay replaced by tools/update_sign_overlay.py (final-render geometry). AUTO-GENERATED from sign-generator v1.4 output_default (seed 20261007) + 2 training boards. Do not hand-edit. */
+/* v5.0: boards regenerated from sign-generator v1.6 (seed 20261007; 10 department rows + Exit; single-word names) by tools/make_stimuli.js. signOverlay unchanged from v4. Do not hand-edit. */
 window.WF_STIMULI = {
  "boardSeed": 20261007,
  "boards": [
@@ -15,7 +15,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "8",
+   "target_row": "9",
    "png_file": "NAT_B1_Radiology_N_L_corrL.png"
   },
   {
@@ -31,7 +31,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "1",
+   "target_row": "2",
    "png_file": "NAT_B1_Radiology_N_L_corrR.png"
   },
   {
@@ -47,7 +47,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "2",
+   "target_row": "1",
    "png_file": "NAT_B1_Radiology_N_R_corrL.png"
   },
   {
@@ -79,7 +79,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "NAT_B1_Radiology_N_Both_corrL.png"
   },
   {
@@ -95,7 +95,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "NAT_B1_Radiology_N_Both_corrR.png"
   },
   {
@@ -143,7 +143,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "6",
+   "target_row": "8",
    "png_file": "NAT_B1_Radiology_N_OnL_corrL.png"
   },
   {
@@ -159,7 +159,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "8",
+   "target_row": "9",
    "png_file": "NAT_B1_Radiology_N_OnL_corrR.png"
   },
   {
@@ -191,7 +191,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "4",
+   "target_row": "5",
    "png_file": "NAT_B1_Radiology_N_OnR_corrR.png"
   },
   {
@@ -207,7 +207,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "3",
+   "target_row": "2",
    "png_file": "NAT_B1_Radiology_N_OnBoth_corrL.png"
   },
   {
@@ -223,14 +223,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "2",
+   "target_row": "3",
    "png_file": "NAT_B1_Radiology_N_OnBoth_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_L_corrL",
+   "board_id": "NAT_B2_Emergency_N_L_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_L_corrL",
    "layout": "L",
@@ -239,14 +239,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "3",
-   "png_file": "NAT_B2_EmergencyEntrance_N_L_corrL.png"
+   "target_row": "4",
+   "png_file": "NAT_B2_Emergency_N_L_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_L_corrR",
+   "board_id": "NAT_B2_Emergency_N_L_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_L_corrR",
    "layout": "L",
@@ -256,13 +256,13 @@ window.WF_STIMULI = {
    "correct_side": "right",
    "congruence": "incongruent",
    "target_row": "1",
-   "png_file": "NAT_B2_EmergencyEntrance_N_L_corrR.png"
+   "png_file": "NAT_B2_Emergency_N_L_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_R_corrL",
+   "board_id": "NAT_B2_Emergency_N_R_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_R_corrL",
    "layout": "R",
@@ -272,13 +272,13 @@ window.WF_STIMULI = {
    "correct_side": "left",
    "congruence": "incongruent",
    "target_row": "1",
-   "png_file": "NAT_B2_EmergencyEntrance_N_R_corrL.png"
+   "png_file": "NAT_B2_Emergency_N_R_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_R_corrR",
+   "board_id": "NAT_B2_Emergency_N_R_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_R_corrR",
    "layout": "R",
@@ -287,14 +287,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "9",
-   "png_file": "NAT_B2_EmergencyEntrance_N_R_corrR.png"
+   "target_row": "10",
+   "png_file": "NAT_B2_Emergency_N_R_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_Both_corrL",
+   "board_id": "NAT_B2_Emergency_N_Both_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_Both_corrL",
    "layout": "Both",
@@ -303,14 +303,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "4",
-   "png_file": "NAT_B2_EmergencyEntrance_N_Both_corrL.png"
+   "target_row": "5",
+   "png_file": "NAT_B2_Emergency_N_Both_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_Both_corrR",
+   "board_id": "NAT_B2_Emergency_N_Both_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_Both_corrR",
    "layout": "Both",
@@ -319,14 +319,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "4",
-   "png_file": "NAT_B2_EmergencyEntrance_N_Both_corrR.png"
+   "target_row": "3",
+   "png_file": "NAT_B2_Emergency_N_Both_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_On_corrL",
+   "board_id": "NAT_B2_Emergency_N_On_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_On_corrL",
    "layout": "On",
@@ -335,14 +335,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "7",
-   "png_file": "NAT_B2_EmergencyEntrance_N_On_corrL.png"
+   "target_row": "8",
+   "png_file": "NAT_B2_Emergency_N_On_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_On_corrR",
+   "board_id": "NAT_B2_Emergency_N_On_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_On_corrR",
    "layout": "On",
@@ -351,14 +351,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "5",
-   "png_file": "NAT_B2_EmergencyEntrance_N_On_corrR.png"
+   "target_row": "4",
+   "png_file": "NAT_B2_Emergency_N_On_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnL_corrL",
+   "board_id": "NAT_B2_Emergency_N_OnL_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnL_corrL",
    "layout": "OnL",
@@ -367,14 +367,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "2",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnL_corrL.png"
+   "target_row": "3",
+   "png_file": "NAT_B2_Emergency_N_OnL_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnL_corrR",
+   "board_id": "NAT_B2_Emergency_N_OnL_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnL_corrR",
    "layout": "OnL",
@@ -383,14 +383,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "8",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnL_corrR.png"
+   "target_row": "9",
+   "png_file": "NAT_B2_Emergency_N_OnL_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnR_corrL",
+   "board_id": "NAT_B2_Emergency_N_OnR_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnR_corrL",
    "layout": "OnR",
@@ -399,14 +399,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "5",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnR_corrL.png"
+   "target_row": "6",
+   "png_file": "NAT_B2_Emergency_N_OnR_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnR_corrR",
+   "board_id": "NAT_B2_Emergency_N_OnR_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnR_corrR",
    "layout": "OnR",
@@ -415,14 +415,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "7",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnR_corrR.png"
+   "target_row": "8",
+   "png_file": "NAT_B2_Emergency_N_OnR_corrR.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnBoth_corrL",
+   "board_id": "NAT_B2_Emergency_N_OnBoth_corrL",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnBoth_corrL",
    "layout": "OnBoth",
@@ -431,14 +431,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "6",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnBoth_corrL.png"
+   "target_row": "7",
+   "png_file": "NAT_B2_Emergency_N_OnBoth_corrL.png"
   },
   {
-   "board_id": "NAT_B2_EmergencyEntrance_N_OnBoth_corrR",
+   "board_id": "NAT_B2_Emergency_N_OnBoth_corrR",
    "condition": "Nature",
    "block": "2",
-   "destination": "Emergency Entrance",
+   "destination": "Emergency",
    "dest_level": "3",
    "cell_id": "N_OnBoth_corrR",
    "layout": "OnBoth",
@@ -447,14 +447,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "3",
-   "png_file": "NAT_B2_EmergencyEntrance_N_OnBoth_corrR.png"
+   "target_row": "2",
+   "png_file": "NAT_B2_Emergency_N_OnBoth_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_L_corrL",
+   "board_id": "NAT_B3_Maternity_N_L_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_L_corrL",
    "layout": "L",
@@ -463,14 +463,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "3",
-   "png_file": "NAT_B3_MaternityWard_N_L_corrL.png"
+   "target_row": "5",
+   "png_file": "NAT_B3_Maternity_N_L_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_L_corrR",
+   "board_id": "NAT_B3_Maternity_N_L_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_L_corrR",
    "layout": "L",
@@ -479,14 +479,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "6",
-   "png_file": "NAT_B3_MaternityWard_N_L_corrR.png"
+   "target_row": "7",
+   "png_file": "NAT_B3_Maternity_N_L_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_R_corrL",
+   "board_id": "NAT_B3_Maternity_N_R_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_R_corrL",
    "layout": "R",
@@ -495,14 +495,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "9",
-   "png_file": "NAT_B3_MaternityWard_N_R_corrL.png"
+   "target_row": "10",
+   "png_file": "NAT_B3_Maternity_N_R_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_R_corrR",
+   "board_id": "NAT_B3_Maternity_N_R_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_R_corrR",
    "layout": "R",
@@ -511,14 +511,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "9",
-   "png_file": "NAT_B3_MaternityWard_N_R_corrR.png"
+   "target_row": "10",
+   "png_file": "NAT_B3_Maternity_N_R_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_Both_corrL",
+   "board_id": "NAT_B3_Maternity_N_Both_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_Both_corrL",
    "layout": "Both",
@@ -528,13 +528,13 @@ window.WF_STIMULI = {
    "correct_side": "left",
    "congruence": "NA",
    "target_row": "7",
-   "png_file": "NAT_B3_MaternityWard_N_Both_corrL.png"
+   "png_file": "NAT_B3_Maternity_N_Both_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_Both_corrR",
+   "board_id": "NAT_B3_Maternity_N_Both_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_Both_corrR",
    "layout": "Both",
@@ -543,14 +543,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "3",
-   "png_file": "NAT_B3_MaternityWard_N_Both_corrR.png"
+   "target_row": "4",
+   "png_file": "NAT_B3_Maternity_N_Both_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_On_corrL",
+   "board_id": "NAT_B3_Maternity_N_On_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_On_corrL",
    "layout": "On",
@@ -559,14 +559,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "1",
-   "png_file": "NAT_B3_MaternityWard_N_On_corrL.png"
+   "target_row": "2",
+   "png_file": "NAT_B3_Maternity_N_On_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_On_corrR",
+   "board_id": "NAT_B3_Maternity_N_On_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_On_corrR",
    "layout": "On",
@@ -576,13 +576,13 @@ window.WF_STIMULI = {
    "correct_side": "right",
    "congruence": "NA",
    "target_row": "8",
-   "png_file": "NAT_B3_MaternityWard_N_On_corrR.png"
+   "png_file": "NAT_B3_Maternity_N_On_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnL_corrL",
+   "board_id": "NAT_B3_Maternity_N_OnL_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnL_corrL",
    "layout": "OnL",
@@ -591,14 +591,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "2",
-   "png_file": "NAT_B3_MaternityWard_N_OnL_corrL.png"
+   "target_row": "3",
+   "png_file": "NAT_B3_Maternity_N_OnL_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnL_corrR",
+   "board_id": "NAT_B3_Maternity_N_OnL_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnL_corrR",
    "layout": "OnL",
@@ -607,14 +607,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "2",
-   "png_file": "NAT_B3_MaternityWard_N_OnL_corrR.png"
+   "target_row": "1",
+   "png_file": "NAT_B3_Maternity_N_OnL_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnR_corrL",
+   "board_id": "NAT_B3_Maternity_N_OnR_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnR_corrL",
    "layout": "OnR",
@@ -624,13 +624,13 @@ window.WF_STIMULI = {
    "correct_side": "left",
    "congruence": "incongruent",
    "target_row": "6",
-   "png_file": "NAT_B3_MaternityWard_N_OnR_corrL.png"
+   "png_file": "NAT_B3_Maternity_N_OnR_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnR_corrR",
+   "board_id": "NAT_B3_Maternity_N_OnR_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnR_corrR",
    "layout": "OnR",
@@ -639,14 +639,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "5",
-   "png_file": "NAT_B3_MaternityWard_N_OnR_corrR.png"
+   "target_row": "6",
+   "png_file": "NAT_B3_Maternity_N_OnR_corrR.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnBoth_corrL",
+   "board_id": "NAT_B3_Maternity_N_OnBoth_corrL",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnBoth_corrL",
    "layout": "OnBoth",
@@ -655,14 +655,14 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "8",
-   "png_file": "NAT_B3_MaternityWard_N_OnBoth_corrL.png"
+   "target_row": "9",
+   "png_file": "NAT_B3_Maternity_N_OnBoth_corrL.png"
   },
   {
-   "board_id": "NAT_B3_MaternityWard_N_OnBoth_corrR",
+   "board_id": "NAT_B3_Maternity_N_OnBoth_corrR",
    "condition": "Nature",
    "block": "3",
-   "destination": "Maternity Ward",
+   "destination": "Maternity",
    "dest_level": "5",
    "cell_id": "N_OnBoth_corrR",
    "layout": "OnBoth",
@@ -671,8 +671,8 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "4",
-   "png_file": "NAT_B3_MaternityWard_N_OnBoth_corrR.png"
+   "target_row": "5",
+   "png_file": "NAT_B3_Maternity_N_OnBoth_corrR.png"
   },
   {
    "board_id": "ABS_B1_Cardiology_A_L_corrL",
@@ -687,7 +687,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "8",
+   "target_row": "7",
    "png_file": "ABS_B1_Cardiology_A_L_corrL.png"
   },
   {
@@ -703,7 +703,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "6",
+   "target_row": "9",
    "png_file": "ABS_B1_Cardiology_A_L_corrR.png"
   },
   {
@@ -719,7 +719,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "2",
+   "target_row": "1",
    "png_file": "ABS_B1_Cardiology_A_R_corrL.png"
   },
   {
@@ -735,7 +735,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "2",
+   "target_row": "3",
    "png_file": "ABS_B1_Cardiology_A_R_corrR.png"
   },
   {
@@ -751,7 +751,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "ABS_B1_Cardiology_A_Both_corrL.png"
   },
   {
@@ -767,7 +767,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "4",
+   "target_row": "5",
    "png_file": "ABS_B1_Cardiology_A_Both_corrR.png"
   },
   {
@@ -783,7 +783,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "7",
+   "target_row": "6",
    "png_file": "ABS_B1_Cardiology_A_On_corrL.png"
   },
   {
@@ -799,7 +799,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "1",
+   "target_row": "2",
    "png_file": "ABS_B1_Cardiology_A_On_corrR.png"
   },
   {
@@ -831,7 +831,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "ABS_B1_Cardiology_A_OnL_corrR.png"
   },
   {
@@ -847,7 +847,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "6",
+   "target_row": "5",
    "png_file": "ABS_B1_Cardiology_A_OnR_corrL.png"
   },
   {
@@ -863,7 +863,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "3",
+   "target_row": "4",
    "png_file": "ABS_B1_Cardiology_A_OnR_corrR.png"
   },
   {
@@ -879,7 +879,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "3",
+   "target_row": "2",
    "png_file": "ABS_B1_Cardiology_A_OnBoth_corrL.png"
   },
   {
@@ -895,7 +895,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "5",
+   "target_row": "8",
    "png_file": "ABS_B1_Cardiology_A_OnBoth_corrR.png"
   },
   {
@@ -911,7 +911,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "8",
+   "target_row": "9",
    "png_file": "ABS_B2_Pharmacy_A_L_corrL.png"
   },
   {
@@ -943,7 +943,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "6",
+   "target_row": "7",
    "png_file": "ABS_B2_Pharmacy_A_R_corrL.png"
   },
   {
@@ -975,7 +975,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "5",
+   "target_row": "6",
    "png_file": "ABS_B2_Pharmacy_A_Both_corrL.png"
   },
   {
@@ -991,7 +991,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "2",
+   "target_row": "3",
    "png_file": "ABS_B2_Pharmacy_A_Both_corrR.png"
   },
   {
@@ -1007,7 +1007,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "2",
+   "target_row": "3",
    "png_file": "ABS_B2_Pharmacy_A_On_corrL.png"
   },
   {
@@ -1055,7 +1055,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "5",
+   "target_row": "6",
    "png_file": "ABS_B2_Pharmacy_A_OnL_corrR.png"
   },
   {
@@ -1071,7 +1071,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "1",
+   "target_row": "2",
    "png_file": "ABS_B2_Pharmacy_A_OnR_corrL.png"
   },
   {
@@ -1087,7 +1087,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "ABS_B2_Pharmacy_A_OnR_corrR.png"
   },
   {
@@ -1103,7 +1103,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "7",
+   "target_row": "8",
    "png_file": "ABS_B2_Pharmacy_A_OnBoth_corrL.png"
   },
   {
@@ -1119,7 +1119,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "3",
+   "target_row": "5",
    "png_file": "ABS_B2_Pharmacy_A_OnBoth_corrR.png"
   },
   {
@@ -1135,7 +1135,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "3",
+   "target_row": "4",
    "png_file": "ABS_B3_Pediatrics_A_L_corrL.png"
   },
   {
@@ -1151,7 +1151,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "7",
+   "target_row": "6",
    "png_file": "ABS_B3_Pediatrics_A_L_corrR.png"
   },
   {
@@ -1199,7 +1199,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "9",
+   "target_row": "10",
    "png_file": "ABS_B3_Pediatrics_A_Both_corrL.png"
   },
   {
@@ -1215,7 +1215,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "5",
+   "target_row": "4",
    "png_file": "ABS_B3_Pediatrics_A_Both_corrR.png"
   },
   {
@@ -1231,7 +1231,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "6",
+   "target_row": "9",
    "png_file": "ABS_B3_Pediatrics_A_On_corrL.png"
   },
   {
@@ -1247,7 +1247,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "none",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "8",
+   "target_row": "7",
    "png_file": "ABS_B3_Pediatrics_A_On_corrR.png"
   },
   {
@@ -1263,7 +1263,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "left",
    "congruence": "congruent",
-   "target_row": "4",
+   "target_row": "5",
    "png_file": "ABS_B3_Pediatrics_A_OnL_corrL.png"
   },
   {
@@ -1279,7 +1279,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "left",
    "correct_side": "right",
    "congruence": "incongruent",
-   "target_row": "6",
+   "target_row": "5",
    "png_file": "ABS_B3_Pediatrics_A_OnL_corrR.png"
   },
   {
@@ -1295,7 +1295,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "left",
    "congruence": "incongruent",
-   "target_row": "2",
+   "target_row": "3",
    "png_file": "ABS_B3_Pediatrics_A_OnR_corrL.png"
   },
   {
@@ -1311,7 +1311,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "right",
    "correct_side": "right",
    "congruence": "congruent",
-   "target_row": "4",
+   "target_row": "2",
    "png_file": "ABS_B3_Pediatrics_A_OnR_corrR.png"
   },
   {
@@ -1327,7 +1327,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "left",
    "congruence": "NA",
-   "target_row": "5",
+   "target_row": "8",
    "png_file": "ABS_B3_Pediatrics_A_OnBoth_corrL.png"
   },
   {
@@ -1343,7 +1343,7 @@ window.WF_STIMULI = {
    "extra_cue_side": "both",
    "correct_side": "right",
    "congruence": "NA",
-   "target_row": "3",
+   "target_row": "1",
    "png_file": "ABS_B3_Pediatrics_A_OnBoth_corrR.png"
   },
   {
@@ -1380,90 +1380,90 @@ window.WF_STIMULI = {
   }
  ],
  "signOverlay": {
- "description": "v4 FINAL renders: blank charcoal sign panel (1.20 x 1.371 m) front face. Equirect: yaw 0 = image centre, +yaw = right, +pitch = up. u=(0.5+yaw/360)*W, v=(0.5-pitch/180)*H.",
- "camera": {
-  "position_m": [
-   0,
-   0,
-   1.6
-  ],
-  "forward": "+Y"
- },
- "sign_world_m": {
-  "x": [
-   -0.6,
-   0.6
-  ],
-  "y_front_face": 3.85,
-  "z": [
-   1.14,
-   2.511
-  ],
-  "standoff_m": 0.15
- },
- "board_fit_note": "Default boardFit=panel: sign-generator v1.5 panel-format boards (assets/boards_panel/, 1400x1600, 7:8) drawn at full panel height = 1.1996 x 1.371 m, filling the panel without stretching. Legacy v1.4 2:3 boards (assets/boards/, 1200x1800): ?boardFit=contain = full height, 0.914 m wide, centred (~14 cm panel each side); ?boardFit=stretch = fills the panel (text 31% wider, comparison only).",
- "points": {
-  "top_left": {
-   "yaw_deg": -8.858,
-   "pitch_deg": 13.159,
-   "px_6000x3000": [
-    2852.4,
-    1280.7
+  "description": "v4 FINAL renders: blank charcoal sign panel (1.20 x 1.371 m) front face. Equirect: yaw 0 = image centre, +yaw = right, +pitch = up. u=(0.5+yaw/360)*W, v=(0.5-pitch/180)*H.",
+  "camera": {
+   "position_m": [
+    0,
+    0,
+    1.6
    ],
-   "px_4096x2048": [
-    1947.2,
-    874.3
-   ]
+   "forward": "+Y"
   },
-  "top_right": {
-   "yaw_deg": 8.858,
-   "pitch_deg": 13.159,
-   "px_6000x3000": [
-    3147.6,
-    1280.7
+  "sign_world_m": {
+   "x": [
+    -0.6,
+    0.6
    ],
-   "px_4096x2048": [
-    2148.8,
-    874.3
-   ]
+   "y_front_face": 3.85,
+   "z": [
+    1.14,
+    2.511
+   ],
+   "standoff_m": 0.15
   },
-  "bottom_left": {
-   "yaw_deg": -8.858,
-   "pitch_deg": -6.733,
-   "px_6000x3000": [
-    2852.4,
-    1612.2
-   ],
-   "px_4096x2048": [
-    1947.2,
-    1100.6
-   ]
+  "board_fit_note": "Default boardFit=panel: sign-generator v1.5 panel-format boards (assets/boards_panel/, 1400x1600, 7:8) drawn at full panel height = 1.1996 x 1.371 m, filling the panel without stretching. Legacy v1.4 2:3 boards (assets/boards/, 1200x1800): ?boardFit=contain = full height, 0.914 m wide, centred (~14 cm panel each side); ?boardFit=stretch = fills the panel (text 31% wider, comparison only).",
+  "points": {
+   "top_left": {
+    "yaw_deg": -8.858,
+    "pitch_deg": 13.159,
+    "px_6000x3000": [
+     2852.4,
+     1280.7
+    ],
+    "px_4096x2048": [
+     1947.2,
+     874.3
+    ]
+   },
+   "top_right": {
+    "yaw_deg": 8.858,
+    "pitch_deg": 13.159,
+    "px_6000x3000": [
+     3147.6,
+     1280.7
+    ],
+    "px_4096x2048": [
+     2148.8,
+     874.3
+    ]
+   },
+   "bottom_left": {
+    "yaw_deg": -8.858,
+    "pitch_deg": -6.733,
+    "px_6000x3000": [
+     2852.4,
+     1612.2
+    ],
+    "px_4096x2048": [
+     1947.2,
+     1100.6
+    ]
+   },
+   "bottom_right": {
+    "yaw_deg": 8.858,
+    "pitch_deg": -6.733,
+    "px_6000x3000": [
+     3147.6,
+     1612.2
+    ],
+    "px_4096x2048": [
+     2148.8,
+     1100.6
+    ]
+   },
+   "center": {
+    "yaw_deg": 0,
+    "pitch_deg": 3.352,
+    "px_6000x3000": [
+     3000,
+     1444.1
+    ],
+    "px_4096x2048": [
+     2048,
+     985.9
+    ]
+   }
   },
-  "bottom_right": {
-   "yaw_deg": 8.858,
-   "pitch_deg": -6.733,
-   "px_6000x3000": [
-    3147.6,
-    1612.2
-   ],
-   "px_4096x2048": [
-    2148.8,
-    1100.6
-   ]
-  },
-  "center": {
-   "yaw_deg": 0.0,
-   "pitch_deg": 3.352,
-   "px_6000x3000": [
-    3000.0,
-    1444.1
-   ],
-   "px_4096x2048": [
-    2048.0,
-    985.9
-   ]
-  }
- },
- "check": "matches Nature/Poster_renders_manifest.csv sign_*_yaw/pitch (+-8.858, 13.159 / -6.733) and sign_px_box 2852 1278 3148 1614"
-}
+  "check": "matches Nature/Poster_renders_manifest.csv sign_*_yaw/pitch (+-8.858, 13.159 / -6.733) and sign_px_box 2852 1278 3148 1614"
+ }
 };

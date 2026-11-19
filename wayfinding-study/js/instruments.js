@@ -49,21 +49,7 @@
       left: "No stress at all", right: "Maximum stress imaginable" }] }],
   };
 
-  // SAM: 9-point pictorial, 5 manikins with selectable points between them. Omitted from the default v4.1
-  // flow (enable with ?sam=1). The docx requires the OFFICIAL
-  // Bradley & Lang figures; they are not bundled. Put them in assets/sam/ as valence_1..5.png and arousal_1..5.png
-  // (1 = left/unpleasant/calm). Until then, labelled placeholder boxes are shown (todo).
-  I.SAM = {
-    id: "SAM", title: "Self-Assessment Manikin", ref: "Bradley & Lang (1994), J Behav Ther Exp Psychiatry 25(1), 49–59.",
-    instructions: "Please select the figure that best represents how you feel right now. You can select any of the figures or the spaces between them.",
-    required: true,
-    samImages: false, // set true once the official figures are in assets/sam/
-    todo: "Official SAM manikin figures not yet added (assets/sam/valence_1..5.png, arousal_1..5.png).",
-    sections: [{ items: [
-      { id: "SAM_valence", text: "Valence", type: "sam", dim: "valence", left: "Very unpleasant (unhappy)", right: "Very pleasant (happy)" },
-      { id: "SAM_arousal", text: "Arousal", type: "sam", dim: "arousal", left: "Very calm (relaxed)", right: "Very excited (aroused)" },
-    ] }],
-  };
+  // v5.0: SAM (Self-Assessment Manikin) removed from the instruments; the study does not use it.
 
   I.STICSA_S = {
     id: "STICSA_S", title: "STICSA – State", ref: "Ree, French, MacLeod & Locke (2008), Behav Cogn Psychother 36(3), 313–332.",
@@ -195,7 +181,6 @@
   const r3 = (x) => (x == null ? null : Math.round(x * 1000) / 1000);
   S.TODAY = () => ({});
   S.VAS = (r) => ({ vas_stress: r.VAS_stress });
-  S.SAM = (r) => ({ sam_valence: r.SAM_valence, sam_arousal: r.SAM_arousal });
   const sticsa = (pre) => (r) => {
     const g = (n) => r[pre + String(n).padStart(2, "0")];
     const som = STICSA_SOMATIC.map(g), cog = STICSA_COGNITIVE.map(g);

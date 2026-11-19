@@ -1,4 +1,6 @@
 /**
+ * Wayfinding SPA v5.0 — data output only: <pid>_questionnaires.csv (long, one row per timepoint) + <pid>_trials.csv + raw/ folder (js/export.js);
+ *   SAM removed; conditionOrder written as Nature_first / Poster_first. Task, timing and randomisation logic are identical to v4.9.
  * Wayfinding SPA v4.9 — per-intersection decision time limit (default 3 s) and DST per-item limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
  * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
  * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
@@ -41,7 +43,6 @@
  *   ?endMath=1                optional short arithmetic task at the end (default off)
  *   ?mathSec=120              duration of the end arithmetic task when endMath=1 (default 120)
  *   ?stressSec=300            duration of the legacy live stress task when liveStress=1 (default 300)
- *   ?sam=1                    include SAM (disabled by default)
  *   ?summary=0                hide the end-of-session performance summary (default shown at the end only)
  *   ?rest=180                 resting-baseline duration in s (default 180 in lab mode, 0 in remote)
  *   ?restBaseline=180         override resting-baseline only (defaults to ?rest=)
@@ -100,7 +101,6 @@
     INTERVIEW: params.get("interview") === "1" || (mode === "lab" && params.get("interview") !== "0"),
     SCREEN_ITEM13_EXCLUDES: false, // docx: item 13 excludes only if the investigator adopts it
     MRT: "pending", // UNDECIDED (Peters MRT-A needs answer key + permission): no MRT items are included
-    SHOW_SAM: params.get("sam") === "1", // SAM kept in instruments.js but omitted from the flow unless ?sam=1
     SHOW_SUMMARY: params.get("summary") !== "0", // shown once at the end, never after each condition
     STRESS_MODE: stressModeFromParams(), // default dst; ?legacyMist=1, ?prep=1 or ?liveStress=1 select legacy modules
     PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
@@ -172,6 +172,7 @@
   };
   let TRAINING = [];
 
+  const WFX = window.WF_EXPORT; // v5.0 export + label helpers (js/export.js)
   const STIM = window.WF_STIMULI;
   const INSTR = window.WF_INSTRUMENTS;
   const SCORE = window.WF_SCORING;
@@ -217,11 +218,12 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v4.9",
+    appVersion: "v5.0",
     participantId: "",
     participantIdSource: "",
     mode,
     seed: null,
+    dstSeed: null, // v5.0: seed of the generated DST arithmetic items (the 2nd block uses dstSeed ^ 0x9e3779b9)
     conditionOrder: "",
     conditionOrderSource: "",
     abstractMode: CONFIG.ABSTRACT_MODE,
@@ -354,7 +356,7 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v49_";
+  const STORAGE_PREFIX = "wf_v50_";
   const LEGACY_STORAGE_PREFIXES = ["wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
@@ -713,7 +715,8 @@
       seed do not depend on the source. The source and bit are logged. */
   function chooseOrder(rnd) {
     const draw = rnd(); // always consumed (as in v3) so block/trial orders for a given seed do not depend on the source
-    const p = params.get("order");
+    const pRaw = params.get("order");
+    const p = pRaw === "Nature_first" ? "NA" : pRaw === "Poster_first" ? "AN" : pRaw; // v5.0: labels accepted too
     if (p === "NA" || p === "AN") return { order: p, source: "url", idBit: orderBit(session.participantId) };
     const bit = orderBit(session.participantId || "");
     return { order: bit ? "NA" : "AN", source: "id_hash_bit", idBit: bit };
@@ -740,7 +743,7 @@
         destination: t.boardId ? BOARDS[t.boardId].destination : "", stimulusPlaceholder: 0 });
     });
     let trialIndex = 0, probeSerial = 0;
-    const plan = { seed, order, orderSource, training: TRAINING.map((t) => t.trainingId), blocks: [] };
+    const plan = { seed, order: WFX.orderLabel(order), orderSource, training: TRAINING.map((t) => t.trainingId), blocks: [] };
     const condQueues = conds.map((cond, ci) => {
       const queue = [];
       shuffle([1, 2, 3], rnd).forEach((blockNo, bi) => {
@@ -1794,8 +1797,7 @@
   }
 
   async function surveySet(list, administration, extra) {
-    const ids = CONFIG.SHOW_SAM ? list : list.filter((id) => id !== "SAM");
-    for (let i = 0; i < ids.length; i++) await survey(ids[i], administration, "", extra);
+    for (let i = 0; i < list.length; i++) await survey(list[i], administration, "", extra);
   }
 
   function splitQueueByBlocks(queue) {
@@ -1919,17 +1921,18 @@
     session.adminMode = adminMode ? 1 : 0;
     session.transStyleDefault = currentTransStyle();
     session.seed = params.has("seed") ? (+params.get("seed") >>> 0) : crypto.getRandomValues(new Uint32Array(1))[0];
+    session.dstSeed = params.has("dstSeed") ? (+params.get("dstSeed") >>> 0) : crypto.getRandomValues(new Uint32Array(1))[0];
     session.startedAt = isoNow();
     surveyRnd = mulberry32((session.seed ^ 0x5a5a1234) >>> 0); // questionnaire item shuffles (SAS), separate stream
     const { practice, condQueues, conds, plan } = buildPlan(session.seed);
     session.plan = plan;
     session.conditionOrder = plan.order;
     session.conditionOrderSource = plan.orderSource;
-    logEvent("session_start", { participantIdSource: session.participantIdSource, seed: session.seed,
+    logEvent("session_start", { participantIdSource: session.participantIdSource, seed: session.seed, dstSeed: session.dstSeed,
       conditionOrder: plan.order, conditionOrderSource: plan.orderSource, idBit: orderBit(session.participantId),
       idRandomPart: session.idRandomPart, adminMode: adminMode ? 1 : 0, transStyle: currentTransStyle(),
       startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE,
-      showSam: CONFIG.SHOW_SAM ? 1 : 0, showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
+      showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION,
       decisionLimitMs: liveDecisionLimitMs,
       decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE ? 1 : 0,
@@ -2243,7 +2246,7 @@
 
   async function stepDst(variant) {
     const first = variant === "first";
-    const listId = first ? "A" : "B";
+    const listId = "generated"; // v5.0: per-participant generated items (Norden et al. 2022); was fixed lists A/B
     const antPhase = first ? "dst_anticipation_1" : "dst_anticipation_2";
     const cdPhase = first ? "dst_countdown_1" : "dst_countdown_2";
     const mathPhase = first ? "dst_1" : "dst_2";
@@ -2261,7 +2264,10 @@
       throwIfAbort();
     }
     setPhase(mathPhase, { variant: variant, duration_s: CONFIG.DST_S, average_pct: CONFIG.DST_AVG, list_id: listId, limit_ms: CONFIG.DST_LIMIT_MS });
-    const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId }), (t, x) => logEvent(t, x));
+    const dstItemSeed = first ? session.dstSeed : ((session.dstSeed ^ 0x9e3779b9) >>> 0);
+    const dstItems = window.WFStress.generateDstItems(dstItemSeed, 250);
+    logEvent("dst_items_generated", { variant: variant, dstSeed: session.dstSeed, itemSeed: dstItemSeed, n: dstItems.length });
+    const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId, list: dstItems }), (t, x) => logEvent(t, x));
     session.stress.dst.segments.push(seg);
     autosave(mathPhase);
     throwIfAbort();
@@ -2498,7 +2504,7 @@
           cursor = "baseline";
         } else if (cursor === "baseline") {
           setPhase("baseline");
-          await surveySet(["VAS", "SAM", "STICSA_S", "STICSA_T"], "baseline");
+          await surveySet(["VAS", "STICSA_S", "STICSA_T"], "baseline");
           throwIfAbort();
           if (mode === "lab") {
             await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
@@ -2538,7 +2544,7 @@
           s = s || ensureSessionStarted(s);
           const c = s.condQueues[0];
           setPhase("post_condition_A", { condition: c.condition });
-          await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_A",
+          await surveySet(["VAS", "STICSA_S", "TLX"], "post_condition_A",
             { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 1 });
           throwIfAbort();
           if (s.condQueues.length > 1) {
@@ -2559,7 +2565,7 @@
             await stepCondition(c, 2, [], nParts);
             throwIfAbort();
             setPhase("post_condition_B", { condition: c.condition });
-            await surveySet(["VAS", "SAM", "STICSA_S", "TLX"], "post_condition_B",
+            await surveySet(["VAS", "STICSA_S", "TLX"], "post_condition_B",
               { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 2 });
             throwIfAbort();
           }
@@ -2627,7 +2633,7 @@
   /* ---------------- end + export ---------------- */
   function condsFromPlan() {
     if (session.plan && session.plan.order) {
-      return session.plan.order.split("").map((c) => (c === "N" ? "Nature" : "Abstract"));
+      return WFX.condsFromOrderLabel(session.plan.order);
     }
     const seen = [];
     session.trials.forEach((t) => {
@@ -2735,81 +2741,25 @@
     URL.revokeObjectURL(url);
   }
 
-  // v0 columns first (unchanged order), v2 additions, then v4 additions
-  const CSV_HEADERS = [
-    "participantId", "mode", "trialType", "trialIndex", "isPractice", "stimulusId", "conditionLabel", "choice",
-    "correctDirection", "accuracy", "rt_ms", "decision_onset_perf", "response_perf", "yaw_at_response",
-    "probeLag", "referencedTrialIndex", "timestamp",
-    "seed", "conditionOrder", "condition", "block", "blockPos", "trainingId", "destination", "renderId",
-    "intendedRenderId", "stimulusPlaceholder", "boardId", "boardFile", "layout", "cellId", "congruence",
-    "targetRow", "scene_onset_perf", "pitch_at_response",
-    "conditionName", "conditionPosition", "blockOrder", "cueType", "legacySceneId", "panoRes", "transStyle",
-    "decisionLimitMs", "timedOut", "referencedTimedOut", "timeoutAdvanceDirection", "decisionLimitHiddenMs",
-  ];
-  const Q_HEADERS = ["participantId", "seed", "conditionOrder", "phase", "administration", "condition", "conditionName",
-    "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "otherText", "nChanges",
-    "page_onset_perf", "first_response_perf", "last_response_perf", "rt_ms", "submit_perf",
-    "first_response_time", "last_response_time", "submit_time", "itemText", "vasMoved", "pages_total"];
-  const SCORE_HEADERS = ["participantId", "seed", "conditionOrder", "phase", "administration", "condition", "conditionName",
-    "conditionPosition", "block", "blockOrder", "destination", "instrument", "submit_time", "duration_ms", "eligible", "exclusion_items", "vas_stress",
-    "sam_valence", "sam_arousal", "somatic", "cognitive", "total", "raw_tlx", "performance_reversed", "sbsod_mean",
-    "sas_mean", "n_answered", "lq", "handedness", "presentedOrder"];
-  const STRESS_HEADERS = ["participantId", "task", "phase", "variant", "list_id", "idx", "item_index", "difficulty", "level", "problem",
-    "operand_a", "operand_b", "operator", "source", "previous", "expected", "given", "correct", "timeout", "feedback",
-    "rt_ms", "limit_ms", "next_limit_ms", "next_level", "cutoff_reason",
-    "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
-  const SUMMARY_HEADERS = ["participantId", "scope", "condition", "conditionName", "conditionPosition", "block", "blockOrder", "destination",
-    "n_decisions", "n_correct", "pct_correct", "n_timeouts", "pct_timeouts", "mean_decision_latency_s", "n_probes", "n_probes_correct", "pct_probes_correct", "blocks_json"];
-  function stressRows() {
-    const rows = [];
-    const add = (res, task) => {
-      if (!res || !res.responses) return;
-      res.responses.forEach((r) => rows.push({ participantId: session.participantId, task, ...r }));
-    };
-    add(session.stress && session.stress.live, "live");
-    add(session.stress && session.stress.endMath, "end_math");
-    const mist = session.stress && session.stress.mist;
-    if (mist && mist.practice) add(mist.practice, "mist");
-    (mist && mist.segments || []).forEach((seg) => add(seg, "mist"));
-    const dst = session.stress && session.stress.dst;
-    (dst && dst.segments || []).forEach((seg) => add(seg, "dst"));
-    return rows;
-  }
+  // v5.0: all export logic lives in js/export.js (shared with the node test). Local helpers only wrap it.
+  function stressRows() { return WFX.stressRows(session); }
   function summaryRows() {
     return (session.summaries || []).map((sm) => ({
       participantId: session.participantId, ...sm, blocks_json: JSON.stringify(sm.blocks || []),
     }));
   }
-  function toCsv(headers, rows, extra) {
-    const cell = (v) => {
-      if (v == null) return "";
-      if (typeof v === "object") v = JSON.stringify(v);
-      v = String(v);
-      return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-    };
-    const lines = [headers.join(",")];
-    rows.forEach((r) => lines.push(headers.map((h) => cell(r[h] != null ? r[h] : extra && extra[h])).join(",")));
-    return lines.join("\n");
-  }
-  function sessionToCsv(sess) { return toCsv(CSV_HEADERS, sess.trials); }
-  function eventHeaders() {
-    const base = ["seq", "event", "phase", "perf", "timestamp", "trialIndex"];
-    const more = new Set();
-    session.events.forEach((e) => Object.keys(e).forEach((k) => { if (!base.includes(k)) more.add(k); }));
-    return base.concat(Array.from(more).sort());
-  }
-  function exportFiles() {
-    const pid = session.participantId || "unknown";
-    const pre = `wayfinding_v49_${pid}_`;
-    return {
-      [pre + "session.json"]: JSON.stringify(session, null, 2),
-      [pre + "trials.csv"]: sessionToCsv(session),
-      [pre + "questionnaires.csv"]: toCsv(Q_HEADERS, session.responses),
-      [pre + "scores.csv"]: toCsv(SCORE_HEADERS, session.scores),
-      [pre + "events.csv"]: toCsv(eventHeaders(), session.events),
-      [pre + "stress.csv"]: toCsv(STRESS_HEADERS, stressRows()),
-      [pre + "summaries.csv"]: toCsv(SUMMARY_HEADERS, summaryRows()),
-    };
+  function sessionToCsv(sess) { return WFX.toCsv(WFX.TRIAL_COLUMNS, WFX.trialRows(sess, BOARDS)); }
+  /** { "<pid>_questionnaires.csv", "<pid>_trials.csv", "raw/<pid>_session.json", "raw/<pid>_events.csv", ... } */
+  function exportFiles() { return WFX.buildFiles(session, { boards: BOARDS }); }
+  function downloadZip() {
+    const files = exportFiles();
+    const bytes = WFX.buildZip(files, new Date());
+    const blob = new Blob([bytes], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = (session.participantId || "unknown") + "_wayfinding_data.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
   }
 
   function onKeyDown(e) {
@@ -2846,7 +2796,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v4.9 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.0 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -2870,22 +2820,17 @@
     $("btn-probe-right").addEventListener("click", () => recordProbeResponse("right"));
     const dl = (suffix, mime) => () => {
       const files = exportFiles();
-      const name = Object.keys(files).find((n) => n.endsWith(suffix));
-      downloadBlob(name, files[name], mime);
+      const full = Object.keys(files).find((n) => n.endsWith(suffix));
+      downloadBlob(full.split("/").pop(), files[full], mime);
     };
-    $("btn-download-json").addEventListener("click", dl("session.json", "application/json"));
-    $("btn-download-csv").addEventListener("click", dl("trials.csv", "text/csv"));
-    $("btn-download-q").addEventListener("click", dl("questionnaires.csv", "text/csv"));
-    $("btn-download-scores").addEventListener("click", dl("scores.csv", "text/csv"));
-    $("btn-download-events").addEventListener("click", dl("events.csv", "text/csv"));
-    $("btn-download-stress").addEventListener("click", dl("stress.csv", "text/csv"));
-    if ($("btn-download-summaries")) $("btn-download-summaries").addEventListener("click", dl("summaries.csv", "text/csv"));
+    $("btn-download-zip").addEventListener("click", downloadZip);
+    $("btn-download-q").addEventListener("click", dl("_questionnaires.csv", "text/csv"));
+    $("btn-download-csv").addEventListener("click", dl("_trials.csv", "text/csv"));
+    $("btn-download-json").addEventListener("click", dl("_session.json", "application/json"));
+    $("btn-download-events").addEventListener("click", dl("_events.csv", "text/csv"));
+    $("btn-download-stress").addEventListener("click", dl("_dst_items.csv", "text/csv"));
     if ($("btn-restart")) $("btn-restart").addEventListener("click", () => location.reload());
-    if ($("btn-fallback-download")) $("btn-fallback-download").addEventListener("click", () => {
-      const files = exportFiles();
-      const name = Object.keys(files).find((n) => n.endsWith("session.json")) || ("wayfinding_v49_" + (session.participantId || "data") + "_session.json");
-      downloadBlob(name, files[name] || JSON.stringify(session, null, 2), "application/json");
-    });
+    if ($("btn-fallback-download")) $("btn-fallback-download").addEventListener("click", downloadZip);
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("beforeunload", (e) => {
       if (session.startedAt && !session.completedAt) { autosave("beforeunload"); e.preventDefault(); e.returnValue = ""; }
@@ -2901,8 +2846,8 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v4.9] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
-      trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE, showSam: CONFIG.SHOW_SAM,
+    console.log("[wayfinding v5.0] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+      trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,
       decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE });

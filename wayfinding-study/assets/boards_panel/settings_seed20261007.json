@@ -3,24 +3,24 @@
   "nature": {
     "destinations": [
       "Radiology",
-      "Emergency Entrance",
-      "Maternity Ward"
+      "Emergency",
+      "Maternity"
     ],
     "fillerPool": [
       "Restrooms",
-      "Gift Shop",
       "Cafeteria",
       "Laboratory",
       "Oncology",
       "Neurology",
       "Surgery",
       "ICU",
-      "Physical Therapy",
       "Chapel",
-      "Outpatient Clinic",
-      "Waiting Area",
       "Orthopedics",
-      "Patient Registration"
+      "Lobby",
+      "Outpatient",
+      "Registration",
+      "Rehabilitation",
+      "Hematology"
     ]
   },
   "abstract": {
@@ -38,36 +38,36 @@
       "Dialysis",
       "Audiology",
       "Pathology",
-      "Medical Records",
-      "Billing Office",
-      "Information Desk",
-      "Nutrition Services",
-      "Sleep Center",
-      "Wound Care"
+      "Records",
+      "Billing",
+      "Information",
+      "Nutrition",
+      "Pulmonology",
+      "Ophthalmology"
     ]
   },
   "useSharedPool": false,
   "sharedPool": [
     "Restrooms",
-    "Gift Shop",
     "Cafeteria",
     "Laboratory",
     "Oncology",
     "Neurology",
     "Surgery",
     "ICU",
-    "Physical Therapy",
     "Chapel",
-    "Outpatient Clinic",
-    "Waiting Area",
     "Orthopedics",
-    "Patient Registration",
+    "Lobby",
+    "Outpatient",
+    "Registration",
+    "Rehabilitation",
+    "Hematology",
     "Parking",
     "Elevators",
     "Dermatology",
     "Urology"
   ],
-  "nRows": 9,
+  "nRows": 10,
   "wayOut": true,
   "wayOutText": "Exit",
   "balanceWayOutArrow": true,
