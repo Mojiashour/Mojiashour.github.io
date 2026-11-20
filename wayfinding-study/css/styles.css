@@ -1742,3 +1742,28 @@ table.matrix input[type=radio] { width: 1.3rem; height: 1.3rem; }
 .survey p.survey-timeframe, .survey .survey-timeframe { color: var(--ink); font-size: 26px; font-weight: 700; }
 table.matrix .lh-lab { font-size: 17px; }
 table.matrix .lh-num { font-size: 19px; }
+
+/* ===================== v5.3 ===================== */
+/* Wayfinding instructions card ends after its content (no empty grey space below) */
+#screen-instructions.active { flex: 0 0 auto; margin-top: 1.5rem; margin-bottom: 1.5rem; }
+/* Intro / transition / destination pages inside the trial frame: Continue centred below the text */
+.intro-btn, #probe-placeholder.intro #btn-intro-continue { align-self: center; margin-top: 1.25rem; }
+#btn-intro-continue ~ .read-wait, .probe-placeholder .read-wait { align-self: center; order: 1; margin: 0.6rem 0 0; }
+.probe-placeholder.intro .read-wait { order: 1; }
+/* "Please read all instructions carefully." now the first line of a page */
+.read-note.read-first { margin: 0 0 1rem; }
+.page > .read-note:first-child, .dst-copy > .read-note:first-child { margin-top: 0; }
+.effort-note { color: var(--ink) !important; }
+/* Small-screen / touch-only block */
+.device-block { border: 2px solid #b00020; background: #fff5f6; color: #8a1f1f !important; padding: 1rem 1.25rem; border-radius: 12px; font-size: 18px; font-weight: 600; }
+/* Math: "Your performance is being recorded" banner */
+.dst-recorded { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin: 0.2rem 0 1rem; padding: 0.75rem 1rem;
+  font-size: clamp(1.4rem, 2.6vw, 2.1rem); font-weight: 800; letter-spacing: -0.01em; color: #fff; background: #b00020; border-radius: 12px; text-align: center; }
+.dst-rec-dot { width: 0.7em; height: 0.7em; border-radius: 50%; background: #fff; flex: 0 0 auto; animation: dst-rec-blink 1.2s ease-in-out infinite; }
+@keyframes dst-rec-blink { 50% { opacity: 0.25; } }
+.dst-pad.shuffled .dst-pad-btn { background: #fff7e6; }
+/* 4 VAS sliders on one page */
+.survey[data-instrument="VAS"] .q { margin-bottom: 0.9rem; padding: 0.9rem 1.1rem; }
+.survey[data-instrument="VAS"] .qtext { font-size: 19px; font-weight: 600; color: var(--ink); margin-bottom: 0.25rem; }
+.survey[data-instrument="VAS"] .vas-prompt { margin: 0 0 0.2rem; font-size: 14px; }
+/* Attention-check rows look like any other row (no highlight) */

@@ -1,4 +1,7 @@
 /**
+ * Wayfinding SPA v5.3 — Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
+ * "Your performance is being recorded"), 4 VAS sliders, I-PANAS-SF x3, STICSA Trait only + attention checks, NR-6,
+ * MENE nature items, small-screen block, centred intro buttons, no per-part time estimates.
  * Wayfinding SPA v5.2 — advisor-meeting changes: wider frame / larger text / right-aligned primary buttons; read-delay countdown before every instruction
  * page's primary button; reworded welcome, math-assessment intro (no auto-start), destination intro; first 3 practice intersections untimed then 3 s
  * (practiceTiming logged); red per-decision timer bar (subtle overall progress); recall-probe -> next intersection uses the normal arrival animation;
@@ -32,7 +35,7 @@
  *   ?res=6k | 4k              panorama derivative (default 6k = 6000x3000 JPEG; 4k = 4096x2048)
  *   ?trialsPerBlock=4         pilot / debugging (default 14)
  *   ?dstSec=90                duration of each DST math block in seconds (default 90; ?mistSec is an alias)
- *   ?dstLimitMs=5000          fixed per-problem time limit in ms (default 5000; departs from Norden's 3 s starting / adaptive limit)
+ *   ?dstLimitMs=3000          STARTING per-problem time limit in ms (default 3000, Norden et al.); adapts x0.9 / x1.1
  *   ?dstAvg=75                fixed comparison-average marker (default 75, as in Norden et al.)
  *   ?legacyMist=1             use the previous adaptive MIST-style block instead of the DST
  *   ?mistSec=90               alias for ?dstSec=; also used if ?legacyMist=1
@@ -117,7 +120,7 @@
     STRESS_MODE: stressModeFromParams(), // default dst; ?legacyMist=1, ?prep=1 or ?liveStress=1 select legacy modules
     PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
     DST_S: num("dstSec", num("mistSec", 90)),
-    DST_LIMIT_MS: num("dstLimitMs", 5000),
+    DST_LIMIT_MS: num("dstLimitMs", 3000), // v5.3: Norden et al. start value; the limit then adapts (stress.js)
     DST_AVG: Math.max(0, Math.min(100, num("dstAvg", 75))),
     DST_ANTICIPATION_MIN_S: num("dstAnticipationMinSec", 20),
     DST_ANTICIPATION_MAX_S: num("dstAnticipationMaxSec", 30),
@@ -232,7 +235,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v5.2",
+    appVersion: "v5.3",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -370,7 +373,7 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v52_";
+  const STORAGE_PREFIX = "wf_v53_";
   const LEGACY_STORAGE_PREFIXES = ["wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
@@ -1101,8 +1104,7 @@
       `<p>Find <strong>\u201c${dest}\u201d</strong>${lvl}.</p>` +
       (lim ? `<p>At each intersection you <strong>must</strong> choose a direction (left or right) within <strong>${lim}</strong>.</p>`
            : "<p>At each intersection, choose a direction (left or right).</p>") +
-      "<p>Choose <strong>quickly</strong> and <strong>accurately</strong>.</p>" +
-      (spec.isPractice ? "" : "<p>This part takes about 1 minute.</p>") };
+      "<p>Choose <strong>quickly</strong> and <strong>accurately</strong>.</p>" };
   }
   function startBlockIntro(spec) {
     currentEvent = spec;
@@ -1903,7 +1905,10 @@
         else if (kind === "skip") done("admin-skip");
         else if (kind === "withdraw") done("withdraw");
       });
-      pageHost().innerHTML = `<div class="page ${o.cls || ""}">${html}${o.readNote ? READ_NOTE : ""}<div class="btn-row">` +
+      // v5.3: "Please read all instructions carefully." is the first line of the page (Moj's doc)
+      const rn = READ_NOTE.replace('class="read-note"', 'class="read-note read-first"');
+      const body = !o.readNote ? html : (html.indexOf("</h2>") >= 0 ? html.replace("</h2>", "</h2>" + rn) : rn + html);
+      pageHost().innerHTML = `<div class="page ${o.cls || ""}">${body}<div class="btn-row">` +
         buttons.map((b) => `<button type="button" data-btn="${b.id}" class="${b.cls || ""}" ${b.disabled ? "disabled" : ""}>${escapeHtml(b.label)}</button>`).join("") +
         `</div></div>`;
       showScreen("page");
@@ -1953,6 +1958,12 @@
       phase: currentPhase, administration, ...(extra || {}) };
     (res.rows || []).forEach((r) => session.responses.push({ ...ctx, ...r }));
     const sc = SCORE[instId] ? SCORE[instId](res.values || {}, { screenItem13Excludes: CONFIG.SCREEN_ITEM13_EXCLUDES }) : {};
+    if (sc && sc.attn_pass !== undefined) { // v5.3 instructed-response attention checks (STICSA Trait, SBSOD)
+      session.attention = session.attention || {};
+      session.attention[instId] = { pass: sc.attn_pass, value: sc.attn_value, administration };
+      session.attention.fail_count = Object.keys(session.attention).filter((k) => k !== "fail_count" && session.attention[k].pass === 0).length;
+      logEvent("attention_check", { instrument: instId, pass: sc.attn_pass, value: sc.attn_value, fail_count: session.attention.fail_count });
+    }
     session.scores.push({ ...ctx, instrument: instId, duration_ms: res.duration_ms,
       presentedOrder: (res.presentedOrder || []).join(" "), submit_time: res.rows && res.rows.length ? res.rows[0].submit_time : isoNow(),
       skipped: res.skipped ? 1 : 0, ...sc });
@@ -2110,17 +2121,28 @@
     return { practice, condQueues, conds };
   }
 
-  function preferDesktop() {
-    const narrow = window.innerWidth < 900;
+  /* v5.3: small screens and touch-only devices are blocked (no "you may still begin"). */
+  const MIN_VIEWPORT_W = 1000;
+  function deviceBlocked() {
+    if (params.get("allowSmall") === "1") return false; // tests / experimenter only
+    const narrow = window.innerWidth < MIN_VIEWPORT_W;
     const touchOnly = window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(pointer: fine)").matches;
     return narrow || touchOnly;
   }
-  function deviceNoteHtml() {
-    return `<p class="device-note" id="device-note" hidden>Please use a laptop or desktop to take part in this study. The task needs a keyboard and a larger screen. You may still begin if you need to.</p>`;
+  function deviceBlockReason() {
+    const touchOnly = window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(pointer: fine)").matches;
+    return touchOnly ? "touch_only" : (window.innerWidth < MIN_VIEWPORT_W ? "narrow" : "");
   }
-  function revealDeviceNote(host) {
+  function deviceNoteHtml() {
+    return `<p class="device-block" id="device-note" role="alert" hidden>This study cannot be completed on a phone, a tablet, or a small window. Please use a laptop or desktop computer with a keyboard. If you are on a computer, make your browser window larger.</p>`;
+  }
+  function syncDeviceBlock(host) {
     const el = (host || document).querySelector("#device-note");
-    if (el && preferDesktop()) el.hidden = false;
+    const btn = (host || document).querySelector('button[data-btn="go"]');
+    const blocked = deviceBlocked();
+    if (el) el.hidden = !blocked;
+    if (btn) { btn.hidden = blocked; btn.disabled = blocked || location.protocol === "file:"; }
+    return blocked;
   }
 
   async function stepSetup() {
@@ -2149,7 +2171,11 @@
       ${deviceNoteHtml()}
       ${fileWarn}`,
       [{ id: "go", label: "Begin", disabled: location.protocol === "file:" }],
-      { onShow: (h) => revealDeviceNote(h) });
+      { noReadDelay: true, onShow: (h) => {
+        if (syncDeviceBlock(h)) logEvent("device_blocked", { reason: deviceBlockReason(), w: window.innerWidth, h: window.innerHeight });
+        const onResize = () => { if (!document.body.contains(h.querySelector("#device-note"))) { window.removeEventListener("resize", onResize); return; } syncDeviceBlock(h); };
+        window.addEventListener("resize", onResize);
+      }, validate: () => !deviceBlocked() });
     return beginSession(urlPid);
   }
 
@@ -2163,7 +2189,8 @@
     await page(`
       <p class="kicker">Before you begin</p>
       <h2>Welcome</h2>
-      <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questionnaires about yourself.</p>
+      <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questions about how you feel and how you find your way.</p>
+      <p class="read-note"><strong>Please read all instructions carefully.</strong></p>
       <p>The session has several parts:</p>
       <ul class="intro-list">
         <li>A short set of questions about how you feel today.</li>
@@ -2171,10 +2198,11 @@
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
-      <p>You will go through a series of intersections, and at each one you must select a direction (left or right).${liveDecisionLimitMs > 0 ? " You will have " + escapeHtml(decisionLimitLabel()) + " to choose at each intersection. If you do not choose in time, a “Time’s up” message appears and the study moves on to the next intersection." : ""} Please try to make your decision <strong>as soon as</strong> you can, while still trying to be <strong>accurate</strong>.${nearby}</p>
-      <p class="privacy-note"><strong>Nothing that identifies you is collected. You are known in the data only by a study code.</strong></p>
+      <p>You will go through a series of intersections, and at each one you must select a direction (left or right).${nearby}</p>
+      <p>The entire study is expected to take [placeholder] of your time. We ask that you fully focus on this task and do not have any distraction. This is a serious data collection. Please select a distraction free environment and once you begin, please complete the experiment. Do not take a break in between.</p>
+      <p class="privacy-note"><strong>Note that nothing that identifies you is collected. You are known in the data only by a randomly generated study code.</strong></p>
       ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}) — confirm before use.</p>` : ""}`,
-      [{ id: "go", label: "Continue" }], { readNote: true });
+      [{ id: "go", label: "Continue" }]);
     logEvent("intro_dismissed", { viewing_ms: Math.round(performance.now() - t0) });
   }
 
@@ -2435,7 +2463,7 @@
     const dstItemSeed = first ? session.dstSeed : ((session.dstSeed ^ 0x9e3779b9) >>> 0);
     const dstItems = window.WFStress.generateDstItems(dstItemSeed, 250);
     logEvent("dst_items_generated", { variant: variant, dstSeed: session.dstSeed, itemSeed: dstItemSeed, n: dstItems.length });
-    const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId, list: dstItems }), (t, x) => logEvent(t, x));
+    const seg = await window.WFStress.runDst(pageHost(), dstCfg({ variant: variant, listId: listId, list: dstItems, seed: dstItemSeed }), (t, x) => logEvent(t, x));
     session.stress.dst.segments.push(seg);
     autosave(mathPhase);
     throwIfAbort();
@@ -2593,8 +2621,7 @@
     skipConditionFlag = false;
     setPhase(`condition_${pos === 1 ? "A" : "B"}`, { condition: c.condition, conditionName: COND_LABEL[c.condition] });
     await page(`<h2>Part ${pos} of ${parts}</h2>
-      <p>In this part you will find your way to <strong>three destinations</strong> in the hospital, one after another. Before each destination you will see a short instruction.</p>
-      <p>Each destination takes about <strong>1 minute</strong>.</p>`, [{ id: "go", label: "Continue" }], { readNote: true });
+      <p>In this part you will find your way to <strong>three destinations</strong> in the hospital, one after another. Before each destination you will see a short instruction.</p>`, [{ id: "go", label: "Continue" }], { readNote: true });
     throwIfAbort();
     logEvent("condition_onset", { condition: c.condition, conditionPosition: pos });
     const blocks = splitQueueByBlocks(c.queue);
@@ -2678,7 +2705,7 @@
           cursor = "baseline";
         } else if (cursor === "baseline") {
           setPhase("baseline");
-          await surveySet(["VAS", "STICSA_S", "STICSA_T"], "baseline");
+          await surveySet(["VAS", "IPANAS", "STICSA_T"], "baseline");
           throwIfAbort();
           if (mode === "lab") {
             await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
@@ -2718,7 +2745,7 @@
           s = s || ensureSessionStarted(s);
           const c = s.condQueues[0];
           setPhase("post_condition_A", { condition: c.condition });
-          await surveySet(["VAS", "STICSA_S", "TLX"], "post_condition_A",
+          await surveySet(["VAS", "IPANAS", "TLX"], "post_condition_A",
             { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 1 });
           throwIfAbort();
           if (s.condQueues.length > 1) {
@@ -2739,7 +2766,7 @@
             await stepCondition(c, 2, [], nParts);
             throwIfAbort();
             setPhase("post_condition_B", { condition: c.condition });
-            await surveySet(["VAS", "STICSA_S", "TLX"], "post_condition_B",
+            await surveySet(["VAS", "IPANAS", "TLX"], "post_condition_B",
               { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 2 });
             throwIfAbort();
           }
@@ -2747,7 +2774,7 @@
         } else if (cursor === "exit") {
           s = s || ensureSessionStarted(s);
           setPhase("post_experiment");
-          await surveySet(["SBSOD", "SAS", "EHI", "DEMO"], "post_experiment");
+          await surveySet(["SBSOD", "SAS", "EHI", "DEMO", "NR6"], "post_experiment");
           throwIfAbort();
           // MRT: UNDECIDED (CONFIG.MRT = "pending"). Disabled module slot; no MRT items are included in v4.
           if (CONFIG.MRT !== "pending") logEvent("mrt_slot", { status: CONFIG.MRT });
@@ -2989,7 +3016,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v5.2 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.3 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -3039,7 +3066,7 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v5.2] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v5.3] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,

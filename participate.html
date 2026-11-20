@@ -24,6 +24,7 @@
     .part-field input{width:100%;font:500 16px var(--sans);padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fafafa;color:var(--ink)}
     .part-field input:focus{outline:2px solid var(--ink);outline-offset:2px;background:#fff}
     .part-err{color:#a11;font-size:14px;min-height:1.2em;margin:8px 0 14px}
+    .part-actions{display:flex;justify-content:flex-end}
     .part-btn{font:600 15px var(--sans);background:var(--ink);color:#fff;border:0;border-radius:999px;padding:12px 22px;cursor:pointer}
     .part-btn:hover{opacity:.9}
     .part-btn:disabled{opacity:.5;cursor:wait}
@@ -42,13 +43,13 @@
       <article class="part-card">
         <h2>Wayfinding Intersection Study</h2>
         <p>This online study looks at how people choose a direction at hospital corridor intersections. You will view a series of intersections on screen and select left or right, and answer a few brief questions about how you feel and how you find your way.</p>
-        <p class="part-meta"><span>~45–70 minutes</span><span>Desktop or laptop with a keyboard</span><span>Chrome recommended</span></p>
+        <p class="part-meta"><span>[placeholder]</span><span>Desktop or laptop with a keyboard</span><span>Chrome recommended</span></p>
         <div class="part-field">
           <label for="study-pw">Study access code</label>
           <input id="study-pw" type="password" autocomplete="off" maxlength="64" placeholder="Enter the code you were given">
         </div>
         <p class="part-err" id="study-err" aria-live="polite"></p>
-        <button type="button" class="part-btn" id="study-start">Start</button>
+        <div class="part-actions"><button type="button" class="part-btn" id="study-start">Start</button></div>
       </article>
       <p class="part-note">Nothing that identifies you is collected. You are known in the data only by a study code. Questions: <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a></p>
     </div>

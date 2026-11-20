@@ -101,13 +101,8 @@
   const DEBRIEF_COPY = {
     title: "Debriefing",
     html: `
-      <p class="draft-banner"><strong>DRAFT for IRB review</strong> — this is not final, IRB-approved debrief language. Contact details for the faculty advisor are placeholders.</p>
-      <p>During the timed arithmetic checks, a bar compared your accuracy with an “average” of other participants.</p>
-      <p>That average was <strong>not</strong> a real average of other participants. It was a fixed reference value (75%) used to create mild evaluative pressure. The problems were designed to be difficult in the time allowed. Performance on this task is not a measure of your ability.</p>
-      <p>The time limit at each wayfinding intersection (3 seconds) was real. If you did not choose in time, a “Time’s up” message appeared and the study continued to the next intersection.</p>
-      <p>The aim of this procedure was to create a mild, temporary feeling of pressure, similar to the everyday anxiety people often feel before a test or presentation. Some details of the procedures were not fully described at the start of the session so that the experience would be closer to ordinary time pressure. We are sorry for any discomfort this may have caused.</p>
-      <p>If you have questions or would like to talk about how you felt during the task, please contact Mojtaba Ashour, student researcher, at <a href="mailto:ma2236@cornell.edu">ma2236@cornell.edu</a>, or Saleh Kalantari, Ph.D., faculty advisor, at [PLACEHOLDER: email and phone]. You may also contact the Cornell Institutional Review Board for Human Participant Research at <a href="mailto:irbhp@cornell.edu">irbhp@cornell.edu</a> or 607-255-5138.</p>
-      <p><strong>[PLACEHOLDER: any further clarification the IRB requires.]</strong></p>`,
+      <p class="draft-banner"><strong>DRAFT for IRB review</strong> — debrief body pending final IRB-approved language.</p>
+      <p class="irb-placeholder">[placeholder]</p>`,
   };
 
   /* ---------------- utilities ---------------- */
@@ -885,11 +880,12 @@
    * From the paper (used as specified):
    *   - 90 s block; duration is not shown to the participant
    *   - two-number + − × ÷ problems, operands 1–99, answers 1–99
-   *   - 5 s per-item limit, held fixed for everyone (no ±10% adaptation,
-   *     no keypad shuffle). This departs from Norden et al., whose DST
-   *     started at 3 s and then sped up or slowed down; the 5 s value
-   *     was chosen for this study because the two-number problems often
-   *     need more time.
+   *   - v5.3: adaptive per-item limit as in Norden et al.: starts at 3 s,
+   *     x0.9 after 3 consecutive correct, x1.1 after 3 consecutive wrong
+   *     or timed out. After each 3-correct streak the keypad digit
+   *     positions are shuffled for the next 4 items. After 5 consecutive
+   *     non-responses a relevance reminder is shown and the next item is
+   *     an easy addition. Keypad only (keyboard digits disabled).
    *   - fake comparison average of 75%
    *   - feedback "Wrong answer!" / "Too slow!"; red cue; next item
    *     immediately after a correct answer
@@ -911,44 +907,51 @@
    *
    * Our other choices:
    *   - 20 s minimum anticipatory screen, then "I'm ready" (v5.2: never auto-starts), then the countdown
-   *   - no camera, no speech, no random keypad, no "only serious results"
-   *     line (the last per the study memo, for a student sample)
+   *   - no camera (instead a large "Your performance is being recorded"
+   *     banner), no speech, no "only serious results" line
    * ======================================================================== */
 
   const DST_DEFAULTS = {
     DURATION_S: 90,
-    LIMIT_MS: 5000,          // study default (fixed); departs from Norden et al. 3 s start / adaptive
+    LIMIT_MS: 3000,          // Norden et al.: first item 3 s, then adaptive
+    LIMIT_MIN_MS: 1000,      // safety floor / ceiling for the adaptive limit (not in the paper)
+    LIMIT_MAX_MS: 10000,
+    ADAPT_N: 3,              // 3 consecutive correct -> x0.9; 3 consecutive wrong/timeout -> x1.1
+    ADAPT_FAST: 0.9,
+    ADAPT_SLOW: 1.1,
+    SHUFFLE_ITEMS: 4,        // keypad digits shuffled for the 4 items after each 3-correct streak
     AVERAGE_PCT: 75,         // Norden et al.: fabricated comparison average
     COUNTDOWN_S: 3,          // Norden et al. / openDST CountdownBeforeTask
     ANTICIPATION_MIN_S: 20,  // grant/memo: 20–30 s anticipatory screen
     ANTICIPATION_MAX_S: 30,
     FEEDBACK_WRONG_MS: 1000, // openDST: 1000 ms on wrong / too slow
     FEEDBACK_CORRECT_MS: 50, // openDST: 50 ms, then next item
-    MISSING_STREAK: 5,       // paper: reminder after 5 consecutive non-responses
-    // Paper then swaps in an easy summation. We keep the fixed list and
-    // only show the reminder, so every participant still sees the same items.
+    MISSING_STREAK: 5,       // paper: reminder after 5 consecutive non-responses, next item an easy addition
   };
 
   const DST_COPY = {
     first: {
-      title: "Math ability test",
-      html: `<p>Your <strong>math ability</strong> will now be <strong>evaluated</strong> under time pressure.</p>
-        <p>You will have <strong>{limit}</strong> for each problem. Your accuracy will be <strong>compared with other participants</strong> in this study.</p>
-        <p>Enter each answer with the number keys or the keypad. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
-        <p class="read-note"><strong>Please read all instructions carefully.</strong></p>`,
+      title: "Cognitive Performance Evaluation",
+      html: `<p class="read-note read-first"><strong>Please read all instructions carefully.</strong></p>
+        <p>Your <strong>individual cognitive performance</strong> will now be <strong>evaluated</strong> under time pressure.</p>
+        <p>You will solve simple arithmetic problems. The time for each problem starts at <strong>{limit}</strong> and changes with your performance. Your accuracy will be <strong>compared with other participants</strong> in this study.</p>
+        <p>Enter each answer by clicking the on-screen keypad. The keyboard cannot be used in this task. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p class="effort-note"><strong>Please give this task your full effort.</strong></p>`,
     },
     second: {
-      title: "Math ability test",
-      html: `<p>Your <strong>math ability</strong> will now be <strong>evaluated again</strong> under time pressure.</p>
-        <p>You will have <strong>{limit}</strong> for each problem. Your accuracy will again be <strong>compared with other participants</strong> in this study.</p>
-        <p>Enter each answer with the number keys or the keypad. Press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
-        <p class="read-note"><strong>Please read all instructions carefully.</strong></p>`,
+      title: "Cognitive Performance Evaluation",
+      html: `<p class="read-note read-first"><strong>Please read all instructions carefully.</strong></p>
+        <p>Your <strong>individual cognitive performance</strong> will now be <strong>evaluated again</strong> under time pressure.</p>
+        <p>You will solve simple arithmetic problems. The time for each problem starts at <strong>{limit}</strong> and changes with your performance. Your accuracy will again be <strong>compared with other participants</strong> in this study.</p>
+        <p>Enter each answer by clicking the on-screen keypad. The keyboard cannot be used in this task. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p class="effort-note"><strong>Please give this task your full effort.</strong></p>`,
     },
     ready: "I’m ready",
     wait: "Available in {n} s",
     countdownLabel: "Get ready",
-    taskTitle: "Timed arithmetic",
-    hint: "Enter your answer with the number keys or the keypad.",
+    taskTitle: "Cognitive Performance Evaluation",
+    hint: "Click the keypad to enter your answer.",
+    recorded: "Your performance is being recorded",
     yourPerf: "You",
     avgPerf: "Average",
     wrong: "Wrong answer!",
@@ -1085,8 +1088,9 @@
   };
 
 
-  function dstPadHtml() {
-    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+  const DST_PAD_STANDARD = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+  function dstPadHtml(layout) {
+    const keys = layout || DST_PAD_STANDARD;
     return `<div class="dst-pad" role="group" aria-label="Number keypad">` +
       keys.map((d) => `<button type="button" class="dst-pad-btn" data-digit="${d}" aria-label="Digit ${d}">${d}</button>`).join("") +
       `</div>`;
@@ -1137,7 +1141,7 @@
     const copyHtml = String(copy.html || "").replace(/\{limit\}/g, limitLabel);
     return new Promise((resolve) => {
       host.innerHTML = `<div class="dst dst-anticipation" data-dst-variant="${variant}">
-        <p class="dst-kicker">Math assessment</p>
+        <p class="dst-kicker">Performance evaluation</p>
         <h2 class="dst-title">${copy.title}</h2>
         <div class="dst-copy">${copyHtml}</div>
         <p class="dst-wait" id="dst-wait"></p>
@@ -1271,7 +1275,8 @@
     const list = (C.list && C.list.length ? C.list : (DST_LISTS[listId] || DST_LISTS.A)).map(function (it, i) {
       return Object.assign({ idx: i + 1 }, it);
     });
-    const limitMs = Math.max(500, C.LIMIT_MS | 0);
+    const limit0 = Math.max(500, C.LIMIT_MS | 0);
+    let limitMs = limit0;
     const durationS = Math.max(1, C.DURATION_S | 0);
     const avgPct = clamp(C.AVERAGE_PCT, 0, 100);
 
@@ -1281,6 +1286,7 @@
           <p class="dst-kicker">${DST_COPY.taskTitle}</p>
           <span id="dst-clock" class="dst-clock" hidden></span>
         </div>
+        <div class="dst-recorded" id="dst-recorded" role="status"><span class="dst-rec-dot" aria-hidden="true"></span>${DST_COPY.recorded}</div>
         <div class="dst-perf" id="dst-perf">
           <div class="dst-bar-row">
             <span class="dst-bar-lab">${DST_COPY.yourPerf}</span>
@@ -1328,6 +1334,23 @@
       const elClock = host.querySelector("#dst-clock");
       const elMissing = host.querySelector("#dst-missing");
       const buttons = Array.from(host.querySelectorAll(".dst-pad-btn"));
+      const padRng = mulberry32((((C.seed >>> 0) || 0x5eed) ^ (variant === "second" ? 0x2545f491 : 0x1b873593)) >>> 0);
+      let streakOk = 0, streakBad = 0, shuffleLeft = 0, padLayout = DST_PAD_STANDARD.slice(), easyNext = false;
+      let curShuffled = 0, curEasy = 0, curLimit = limitMs;
+      const easyRng = mulberry32((((C.seed >>> 0) || 0x5eed) ^ 0x68e31da4) >>> 0);
+      const makeEasy = () => { const a = 1 + Math.floor(easyRng() * 9), b = 1 + Math.floor(easyRng() * 9);
+        return { a, b, op: "+", expr: a + " + " + b, answer: a + b, source: "easy_addition" }; };
+      const setPadLayout = (layout) => {
+        padLayout = layout;
+        buttons.forEach((b, i) => { b.setAttribute("data-digit", String(layout[i])); b.textContent = String(layout[i]); b.setAttribute("aria-label", "Digit " + layout[i]); });
+        const pad = host.querySelector(".dst-pad"); if (pad) pad.classList.toggle("shuffled", layout.join() !== DST_PAD_STANDARD.join());
+      };
+      const shuffledLayout = () => {
+        let a;
+        do { a = DST_PAD_STANDARD.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(padRng() * (i + 1)); const x = a[i]; a[i] = a[j]; a[j] = x; } }
+        while (a.join() === DST_PAD_STANDARD.join());
+        return a;
+      };
 
       const t0 = performance.now();
       const responses = [];
@@ -1375,7 +1398,12 @@
           pct_correct: responses.length ? Math.round(1000 * nCorrect / responses.length) / 10 : 0,
           average_marker_pct: avgPct,
           your_pct: responses.length ? Math.round(10 * yourPct()) / 10 : 0,
-          limit_ms: limitMs,
+          limit_ms: limit0,
+          limit_start_ms: limit0,
+          limit_final_ms: Math.round(limitMs),
+          adaptive: 1,
+          n_shuffled_items: responses.filter((r) => r.keypad_shuffled === 1).length,
+          n_easy_items: responses.filter((r) => r.easy_item === 1).length,
           duration_s: durationS,
           duration_ms: duration_ms,
           wordingVersion: C.wordingVersion || WORDING_VERSION,
@@ -1383,7 +1411,7 @@
         };
         onEvent && onEvent("dst_offset", { variant: variant, list_id: listId, skipped: skipped ? 1 : 0, summary: summary });
         resolve({
-          config: { DURATION_S: durationS, LIMIT_MS: limitMs, AVERAGE_PCT: avgPct, listId: listId },
+          config: { DURATION_S: durationS, LIMIT_MS: limit0, ADAPTIVE: 1, AVERAGE_PCT: avgPct, listId: listId, KEYPAD_ONLY: 1 },
           phase: "experimental",
           variant: variant,
           list_id: listId,
@@ -1408,6 +1436,15 @@
         if (correct) { nCorrect++; noAnswerStreak = 0; }
         else if (timeout) { nTimeout++; noAnswerStreak++; }
         else { nWrong++; noAnswerStreak = 0; }
+        // Norden et al. adaptation (applies from the next item)
+        const limitBefore = curLimit;
+        let adapt = "";
+        if (kind !== "block_end") {
+          if (correct) { streakOk++; streakBad = 0; } else { streakBad++; streakOk = 0; }
+          if (streakOk >= C.ADAPT_N) { limitMs = clamp(limitMs * C.ADAPT_FAST, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS); streakOk = 0; shuffleLeft = C.SHUFFLE_ITEMS; adapt = "faster_shuffle"; }
+          else if (streakBad >= C.ADAPT_N) { limitMs = clamp(limitMs * C.ADAPT_SLOW, C.LIMIT_MIN_MS, C.LIMIT_MAX_MS); streakBad = 0; adapt = "slower"; }
+          if (noAnswerStreak >= C.MISSING_STREAK) easyNext = true;
+        }
 
         const row = {
           idx: responses.length + 1,
@@ -1427,7 +1464,12 @@
           timeout: timeout ? 1 : 0,
           feedback: feedback,
           rt_ms: Math.round(now - itemOnset),
-          limit_ms: limitMs,
+          limit_ms: Math.round(limitBefore),
+          next_limit_ms: Math.round(limitMs),
+          adapt_event: adapt,
+          keypad_shuffled: curShuffled,
+          keypad_layout: padLayout.join(""),
+          easy_item: curEasy,
           cutoff_reason: kind === "block_end" ? "block_end" : (timeout ? "item_limit" : ""),
           onset_perf: +itemOnset.toFixed(1),
           response_perf: +now.toFixed(1),
@@ -1480,12 +1522,22 @@
         elFb.textContent = "\u00a0";
         elFb.className = "dst-fb";
         dstFlash(false);
-        if (elMissing) {
-          const showRem = noAnswerStreak >= C.MISSING_STREAK;
-          elMissing.hidden = !showRem;
+        const showRem = easyNext;
+        if (elMissing) elMissing.hidden = !showRem;
+        if (easyNext) {
+          current = Object.assign(makeEasy(), { idx: "easy" });
+          easyNext = false;
+          noAnswerStreak = 0; // another 5 non-responses trigger the reminder again
+          curEasy = 1;
+          onEvent && onEvent("dst_easy_item", { variant: variant, problem: current.expr });
+        } else {
+          current = list[currentIndex];
+          currentIndex += 1;
+          curEasy = 0;
         }
-        current = list[currentIndex];
-        currentIndex += 1;
+        if (shuffleLeft > 0) { setPadLayout(shuffledLayout()); shuffleLeft -= 1; curShuffled = 1; }
+        else { if (padLayout.join() !== DST_PAD_STANDARD.join()) setPadLayout(DST_PAD_STANDARD.slice()); curShuffled = 0; }
+        curLimit = limitMs;
         if (elProb) elProb.textContent = current.expr;
         renderAnswer();
         setPadEnabled(true);
@@ -1494,9 +1546,9 @@
         if (elFill) elFill.style.width = "100%";
         clearTimeout(timer);
         const remainBlock = durationS * 1000 - (itemOnset - t0);
-        const thisLimit = Math.max(0, Math.min(limitMs, remainBlock));
+        const thisLimit = Math.max(0, Math.min(Math.round(curLimit), remainBlock));
         timer = setTimeout(() => {
-          if (remainBlock <= limitMs + 16 && (performance.now() - t0) >= durationS * 1000 - 30) {
+          if (remainBlock <= curLimit + 16 && (performance.now() - t0) >= durationS * 1000 - 30) {
             respond("block_end", typed);
           } else {
             respond("timeout", typed);
@@ -1505,7 +1557,7 @@
         onEvent && onEvent("dst_item_onset", {
           variant: variant, list_id: listId, idx: responses.length + 1,
           item_index: current.idx, problem: current.expr, limit_ms: thisLimit,
-          source: current.source || "study_list",
+          source: current.source || "study_list", keypad_shuffled: curShuffled, keypad_layout: padLayout.join(""), easy_item: curEasy,
         });
       };
 
@@ -1514,7 +1566,7 @@
         const left = durationS * 1000 - (now - t0);
         if (elClock && !elClock.hidden) elClock.textContent = fmtClock(left);
         if (!locked && current && elFill) {
-          const frac = Math.max(0, 1 - (now - itemTimerStart) / limitMs);
+          const frac = Math.max(0, 1 - (now - itemTimerStart) / curLimit);
           elFill.style.width = (100 * frac) + "%";
         }
         if (left <= 0 && !locked) {
@@ -1538,11 +1590,8 @@
       const onKey = (e) => {
         if (done) return;
         if (isAdminEscape(e)) { e.preventDefault(); finish(true, "skipped"); return; }
-        if (locked) return;
-        if (e.key >= "0" && e.key <= "9") {
-          e.preventDefault();
-          acceptDigit(e.key);
-        }
+        // v5.3: keyboard digits disabled (keypad only); swallowed so they do nothing
+        if (e.key >= "0" && e.key <= "9") { e.preventDefault(); e.stopPropagation(); onEvent && onEvent("dst_keyboard_blocked", { key: e.key }); }
       };
 
       buttons.forEach((b) => {
@@ -1556,7 +1605,7 @@
       activeSkip = () => finish(true, "skipped");
       onEvent && onEvent("dst_onset", {
         variant: variant, list_id: listId, duration_s: durationS,
-        limit_ms: limitMs, average_marker_pct: avgPct,
+        limit_ms: limit0, adaptive: 1, keypad_only: 1, average_marker_pct: avgPct,
         n_items: list.length, wordingVersion: C.wordingVersion || WORDING_VERSION,
         protocol: "dst_norden_2022",
       });
@@ -1575,7 +1624,7 @@
     const avg = s.average_marker_pct == null ? 75 : s.average_marker_pct;
     const n = s.n_responses || 0;
     const ok = s.n_correct || 0;
-    return `<p class="dst-kicker">Math assessment</p>
+    return `<p class="dst-kicker">Performance evaluation</p>
       <h2 class="dst-title">Your results</h2>
       <p>Your accuracy: <strong>${you}%</strong> (${ok} of ${n} problems correct).</p>
       <p>Comparison average: <strong>${avg}%</strong>.</p>`;

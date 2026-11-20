@@ -228,6 +228,7 @@
           <p class="survey-instr${inst.heading ? "" : " lead"}">${instr}</p>
           ${inst.timeframe ? `<p class="survey-timeframe">${esc(inst.timeframe)}</p>` : ""}</div>`;
 
+        let vasN = 0; // v5.3: the drag instruction is shown once per page (above the first slider)
         // Group this page's items by section so headings appear when needed
         const bySec = [];
         slice.forEach((it) => {
@@ -274,7 +275,7 @@
                 (it.allowPna ? ` <label class="opt pna-opt"><input type="checkbox" class="pna-toggle" data-pna-for="${it.id}"> <span>I prefer not to answer</span></label>` : "") +
                 `</div>`;
             } else if (it.type === "vas") {
-              html += `<p class="vas-prompt">Click on the line and drag to indicate your rating</p>
+              html += `${vasN++ === 0 ? '<p class="vas-prompt">Click on the line and drag to indicate your rating</p>' : ""}
                 <div class="vas untouched" data-vas="${it.id}"><div class="vas-track" role="slider" aria-label="${esc(it.text)}" aria-valuemin="0" aria-valuemax="100"><div class="vas-thumb"></div></div>
                 <div class="vas-ends"><span>${esc(it.left)}</span><span>${esc(it.right)}</span></div></div>`;
             } else if (it.type === "sam") {

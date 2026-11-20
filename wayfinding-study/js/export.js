@@ -1,4 +1,7 @@
 /**
+ * v5.3 export: 4 VAS columns (vas_stressed/frustrated/overstrained/ashamed), I-PANAS-SF items + PA/NA, STICSA Trait only
+ * (State columns dropped), attention checks (attn_*), NR-6, MENE nature items + nature_visit_weekly, no free-text demographics,
+ * adaptive DST columns (next_limit_ms, adapt_event, keypad_shuffled, keypad_layout, easy_item).
  * v5.0 data export (v5.2: DEM_occupation no longer collected; sleep hours / age exported from dropdowns, sleep "More than 14" = 15). Pure functions (no DOM), shared by the app (window.WF_EXPORT) and the node test (module.exports).
  *
  * Per participant the export is:
@@ -59,32 +62,38 @@
   const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
 
   const DEM_IDS = ["DEM_age", "DEM_gender", "DEM_education", "DEM_race", "DEM_english",
-    "DEM_hospfamiliar", "DEM_hospvisits", "DEM_healthcarework", "DEM_videogames", "DEM_vrexp", "DEM_nature"];
-  const DEM_OTHER = ["DEM_gender", "DEM_race", "DEM_english"]; // choices that offer a free-text "other"
+    "DEM_hospfamiliar", "DEM_hospvisits", "DEM_healthcarework", "DEM_videogames", "DEM_vrexp", "DEM_nature_visit", "DEM_nature_media"];
+  // v5.3: no free-text "other" fields are collected any more (gender/race "Others" has no text box; English is Yes/No).
+  const WEEKLY = ["more_than_once_day", "every_day", "several_times_week", "once_week"];
 
   const PARTICIPANT_COLS = ["participant_id", "app_version", "seed", "cond_order", "order_source", "end_reason", "exclude_flag"]
-    .concat(DEM_IDS.map((x) => x.toLowerCase()), DEM_OTHER.map((x) => x.toLowerCase() + "_other"));
+    .concat(DEM_IDS.map((x) => x.toLowerCase()), ["nature_visit_weekly", "attn_sticsa_t_pass", "attn_sbsod_pass", "attn_fail_count"]);
   const KEY_COLS = ["timepoint_no", "timepoint", "cond_position", "condition", "block_no", "block_order", "destination", "submit_time"];
 
   // [output column, source item id or score key]
   const MEASURE_SPEC = [];
   ["SCR14", "SCR15", "SCR16", "SCR17"].forEach((id) => MEASURE_SPEC.push(["today_" + id.toLowerCase(), "item", id]));
-  MEASURE_SPEC.push(["vas_stress", "item", "VAS_stress"]);
-  range(21).forEach((i) => MEASURE_SPEC.push(["sticsa_s_" + pad2(i), "item", "STS" + pad2(i)]));
-  MEASURE_SPEC.push(["sticsa_s_somatic", "score", "STICSA_S", "somatic"], ["sticsa_s_cognitive", "score", "STICSA_S", "cognitive"],
-    ["sticsa_s_total", "score", "STICSA_S", "total"]);
+  ["stressed", "frustrated", "overstrained", "ashamed"].forEach((k) => MEASURE_SPEC.push(["vas_" + k, "item", "VAS_" + k]));
+  const IPANAS = ["upset", "hostile", "alert", "ashamed", "inspired", "nervous", "determined", "attentive", "afraid", "active"];
+  IPANAS.forEach((k) => MEASURE_SPEC.push(["ipanas_" + k, "item", "IPANAS_" + k]));
+  MEASURE_SPEC.push(["ipanas_pa", "score", "IPANAS", "pa"], ["ipanas_na", "score", "IPANAS", "na"]);
   range(21).forEach((i) => MEASURE_SPEC.push(["sticsa_t_" + pad2(i), "item", "STT" + pad2(i)]));
+  MEASURE_SPEC.push(["sticsa_t_attn", "item", "STT_ATTN"]);
   MEASURE_SPEC.push(["sticsa_t_somatic", "score", "STICSA_T", "somatic"], ["sticsa_t_cognitive", "score", "STICSA_T", "cognitive"],
     ["sticsa_t_total", "score", "STICSA_T", "total"]);
   ["mental", "physical", "temporal", "performance", "effort", "frustration"].forEach((k) => MEASURE_SPEC.push(["tlx_" + k, "item", "TLX_" + k]));
   MEASURE_SPEC.push(["tlx_raw", "score", "TLX", "raw_tlx"]);
   range(15).forEach((i) => MEASURE_SPEC.push(["sbsod_" + pad2(i), "item", "SBSOD" + pad2(i)]));
+  MEASURE_SPEC.push(["sbsod_attn", "item", "SBSOD_ATTN"]);
   MEASURE_SPEC.push(["sbsod_mean", "score", "SBSOD", "sbsod_mean"]);
   range(13).forEach((i) => MEASURE_SPEC.push(["sas_" + pad2(i), "item", "SAS" + pad2(i)]));
   MEASURE_SPEC.push(["sas_mean", "score", "SAS", "sas_mean"]);
   ["writing", "throwing", "toothbrush", "spoon"].forEach((k) => MEASURE_SPEC.push(["ehi_" + k, "item", "EHI_" + k]));
   MEASURE_SPEC.push(["ehi_lq", "score", "EHI", "lq"], ["ehi_handedness", "score", "EHI", "handedness"]);
-  const DST_COLS = ["dst_n_items", "dst_n_correct", "dst_n_wrong", "dst_n_timeout", "dst_pct_correct", "dst_mean_rt_ms"];
+  range(6).forEach((i) => MEASURE_SPEC.push(["nr6_" + pad2(i), "item", "NR6_" + pad2(i)]));
+  MEASURE_SPEC.push(["nr6_mean", "score", "NR6", "nr6_mean"]);
+  const DST_COLS = ["dst_n_items", "dst_n_correct", "dst_n_wrong", "dst_n_timeout", "dst_pct_correct", "dst_mean_rt_ms",
+    "dst_limit_start_ms", "dst_limit_final_ms", "dst_n_shuffled", "dst_n_easy"];
 
   const Q_COLUMNS = PARTICIPANT_COLS.concat(KEY_COLS, MEASURE_SPEC.map((m) => m[0]), DST_COLS);
 
@@ -120,6 +129,10 @@
       dst_n_timeout: sm.n_timeout != null ? sm.n_timeout : rs.filter((r) => +r.timeout === 1).length,
       dst_pct_correct: sm.pct_correct != null ? sm.pct_correct : (rs.length ? Math.round(1000 * rs.filter((r) => +r.correct === 1).length / rs.length) / 10 : ""),
       dst_mean_rt_ms: rts.length ? Math.round(rts.reduce((s, x) => s + x, 0) / rts.length) : "",
+      dst_limit_start_ms: sm.limit_start_ms != null ? sm.limit_start_ms : (sm.limit_ms != null ? sm.limit_ms : ""),
+      dst_limit_final_ms: sm.limit_final_ms != null ? sm.limit_final_ms : "",
+      dst_n_shuffled: rs.filter((r) => +r.keypad_shuffled === 1).length,
+      dst_n_easy: rs.filter((r) => +r.easy_item === 1).length,
     };
   }
 
@@ -133,12 +146,17 @@
       end_reason: session.endReason,
       exclude_flag: session.excludeFromAnalysis ? 1 : 0,
     };
+    const attn = {};
     (session.responses || []).forEach((r) => {
-      if (DEM_IDS.indexOf(r.itemId) >= 0) {
-        p[r.itemId.toLowerCase()] = r.value;
-        if (DEM_OTHER.indexOf(r.itemId) >= 0 && r.otherText) p[r.itemId.toLowerCase() + "_other"] = r.otherText;
-      }
+      if (DEM_IDS.indexOf(r.itemId) >= 0) p[r.itemId.toLowerCase()] = r.value;
+      if (r.itemId === "STT_ATTN") attn.sticsa = String(r.value) === "3" ? 1 : 0;
+      if (r.itemId === "SBSOD_ATTN") attn.sbsod = String(r.value) === "5" ? 1 : 0;
     });
+    const nv = p.dem_nature_visit;
+    p.nature_visit_weekly = nv == null || nv === "" || nv === "pna" ? "" : (WEEKLY.indexOf(String(nv)) >= 0 ? 1 : 0);
+    p.attn_sticsa_t_pass = attn.sticsa != null ? attn.sticsa : "";
+    p.attn_sbsod_pass = attn.sbsod != null ? attn.sbsod : "";
+    p.attn_fail_count = (attn.sticsa != null || attn.sbsod != null) ? [attn.sticsa, attn.sbsod].filter((x) => x === 0).length : "";
     return p;
   }
 
@@ -240,13 +258,13 @@
 
   /* ---------------- raw files ---------------- */
   const Q_ITEM_HEADERS = ["participantId", "seed", "conditionOrder", "phase", "administration", "condition", "conditionName",
-    "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "otherText", "nChanges",
+    "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "nChanges",
     "page_onset_perf", "first_response_perf", "last_response_perf", "rt_ms", "submit_perf",
     "first_response_time", "last_response_time", "submit_time", "itemText", "vasMoved", "pages_total"];
   // v4.9 stress columns without the dead ones (difficulty, level, previous, next_limit_ms, next_level)
   const DST_ITEM_HEADERS = ["participantId", "task", "phase", "variant", "list_id", "idx", "item_index", "problem",
     "operand_a", "operand_b", "operator", "source", "expected", "given", "correct", "timeout", "feedback",
-    "rt_ms", "limit_ms", "cutoff_reason", "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
+    "rt_ms", "limit_ms", "next_limit_ms", "adapt_event", "keypad_shuffled", "keypad_layout", "easy_item", "cutoff_reason", "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
 
   function stressRows(session) {
     const rows = [];
