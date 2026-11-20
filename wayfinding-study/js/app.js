@@ -1,5 +1,5 @@
 /**
- * Wayfinding SPA v5.3 — Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
+ * Wayfinding SPA v5.4 — text edits (welcome, instructions, math intro) and familiarity prefer-not fix; v5.3 had Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
  * "Your performance is being recorded"), 4 VAS sliders, I-PANAS-SF x3, STICSA Trait only + attention checks, NR-6,
  * MENE nature items, small-screen block, centred intro buttons, no per-part time estimates.
  * Wayfinding SPA v5.2 — advisor-meeting changes: wider frame / larger text / right-aligned primary buttons; read-delay countdown before every instruction
@@ -235,7 +235,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v5.3",
+    appVersion: "v5.4",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -373,8 +373,8 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v53_";
-  const LEGACY_STORAGE_PREFIXES = ["wf_v48_", "wf_v44_"];
+  const STORAGE_PREFIX = "wf_v54_";
+  const LEGACY_STORAGE_PREFIXES = ["wf_v53_", "wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
     Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
@@ -951,7 +951,7 @@
     if (!el) return;
     if (liveDecisionLimitMs > 0) {
       el.hidden = false;
-      el.innerHTML = "In the task you <strong>must</strong> choose a direction within <strong>" + escapeHtml(decisionLimitLabel()) + "</strong>. If you do not, a “Time’s up” message appears and the study moves on to the next intersection.";
+      el.innerHTML = "You <strong>must</strong> choose a direction within <strong>" + escapeHtml(decisionLimitLabel()) + "</strong>. If you do not, a “Time’s up” message appears and you move on to the next intersection.";
     } else {
       el.hidden = true;
       el.innerHTML = "";
@@ -2184,23 +2184,24 @@
     logEvent("intro_shown", { wordingVersion: CONFIG.WORDING_VERSION });
     const t0 = performance.now();
     const nearby = mode === "lab"
-      ? " The experimenter will be nearby if you have questions."
+      ? "The experimenter will be nearby if you have questions."
       : "";
     await page(`
       <p class="kicker">Before you begin</p>
       <h2>Welcome</h2>
-      <p>Thank you for taking part in this study. In this session you will complete a hospital wayfinding task on the computer, along with a few brief questions about how you feel and how you find your way.</p>
+      <p>Thank you for taking part in this study. In this session, you will complete a hospital wayfinding task on the computer and answer a few brief questions about how you feel and how you find your way.</p>
       <p class="read-note"><strong>Please read all instructions carefully.</strong></p>
       <p>The session has several parts:</p>
       <ul class="intro-list">
         <li>A short set of questions about how you feel today.</li>
-        <li>A few practice intersections so you can get used to the controls.</li>
+        <li>A few practice intersections to help you get used to the controls.</li>
         <li>Two wayfinding parts, each with several destinations in a hospital environment.</li>
         <li>A few questionnaires at the end of the session.</li>
       </ul>
-      <p>You will go through a series of intersections, and at each one you must select a direction (left or right).${nearby}</p>
-      <p>The entire study is expected to take [placeholder] of your time. We ask that you fully focus on this task and do not have any distraction. This is a serious data collection. Please select a distraction free environment and once you begin, please complete the experiment. Do not take a break in between.</p>
-      <p class="privacy-note"><strong>Note that nothing that identifies you is collected. You are known in the data only by a randomly generated study code.</strong></p>
+      <p>In the wayfinding parts, you will go through a series of intersections. At each one, you must choose a direction (left or right).</p>
+      ${nearby ? `<p>${nearby}</p>` : ""}
+      <p>The study takes about [placeholder] to complete. This is a serious data collection effort, so please give the task your full attention. Choose a quiet place without distractions, and once you begin, please complete the study in one sitting without taking breaks.</p>
+      <p class="privacy-note">No information that identifies you is collected. In the data, you are known only by a randomly generated study code.</p>
       ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}) — confirm before use.</p>` : ""}`,
       [{ id: "go", label: "Continue" }]);
     logEvent("intro_dismissed", { viewing_ms: Math.round(performance.now() - t0) });
@@ -3016,7 +3017,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v5.3 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.4 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -3066,7 +3067,7 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v5.3] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v5.4] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,

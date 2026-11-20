@@ -254,20 +254,26 @@
             if (it.hint) html += `<div class="qhint">${esc(it.hint)}</div>`;
             const opts = it.options || sec.options;
             if (it.type === "choice" && it.display === "hscale") {
-              // v5.2: horizontal 1-N scale with endpoint labels; "prefer not to answer" is a separate option below
-              const pts = opts.filter((o) => o.v !== "pna"), pna = opts.find((o) => o.v === "pna");
-              html += `<div class="hscale"><span class="hs-end">${esc(it.endLabels[0])}</span><div class="hs-pts">` + pts.map((o) =>
+              // v5.4: 1-N scale and "I prefer not to answer" live in the same question block, PNA directly under the scale
+              const pts = opts.filter((o) => String(o.v) !== "pna"), pna = opts.find((o) => String(o.v) === "pna");
+              html += `<div class="hscale-block"><div class="hscale"><span class="hs-end">${esc(it.endLabels[0])}</span><div class="hs-pts">` + pts.map((o) =>
                 `<label class="hs-pt"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"><span>${esc(o.label)}</span></label>`).join("") +
                 `</div><span class="hs-end">${esc(it.endLabels[1])}</span></div>` +
-                (pna ? `<div class="hs-pna"><label class="opt"><input type="radio" name="${it.id}" value="pna"> <span>${esc(pna.label)}</span></label></div>` : "");
+                (pna ? `<div class="hs-pna"><label class="opt pna-opt"><input type="radio" name="${it.id}" value="pna"> <span>${esc(pna.label)}</span></label></div>` : "") +
+                `</div>`;
             } else if (it.type === "select") {
               html += `<div class="opts"><select class="sel" name="${it.id}" aria-label="${esc(it.text)}"><option value="">Select…</option>` +
                 opts.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join("") + `</select>` +
                 (it.unit ? ` <span class="unit">${esc(it.unit)}</span>` : "") + `</div>`;
             } else if (it.type === "choice" || it.type === "multi") {
-              html += `<div class="opts ${opts.length > 5 || opts.some((o) => o.label.length > 22) ? "opts-col" : ""}">` + opts.map((o) =>
-                `<label class="opt"><input type="${it.type === "multi" ? "checkbox" : "radio"}" name="${it.id}" value="${esc(o.v)}" ${o.exclusive ? 'data-exclusive="1"' : ""}> <span>${esc(o.label)}</span>` +
-                (o.other ? ` <input type="text" class="other" data-other-for="${it.id}" data-opt="${esc(o.v)}" maxlength="80" autocomplete="off">` : "") + `</label>`).join("") + `</div>`;
+              const pnaOpts = opts.filter((o) => String(o.v) === "pna");
+              const mainOpts = opts.filter((o) => String(o.v) !== "pna");
+              const col = mainOpts.length > 5 || mainOpts.some((o) => o.label.length > 22) || pnaOpts.length ? "opts-col" : "";
+              const optHtml = (o) =>
+                `<label class="opt${String(o.v) === "pna" ? " pna-opt" : ""}"><input type="${it.type === "multi" ? "checkbox" : "radio"}" name="${it.id}" value="${esc(o.v)}" ${o.exclusive ? 'data-exclusive="1"' : ""}> <span>${esc(o.label)}</span>` +
+                (o.other ? ` <input type="text" class="other" data-other-for="${it.id}" data-opt="${esc(o.v)}" maxlength="80" autocomplete="off">` : "") + `</label>`;
+              html += `<div class="opts ${col}${pnaOpts.length ? " opts-has-pna" : ""}">` + mainOpts.map(optHtml).join("") +
+                (pnaOpts.length ? `<div class="pna-row">` + pnaOpts.map(optHtml).join("") + `</div>` : "") + `</div>`;
             } else if (it.type === "number") {
               html += `<div class="opts"><input type="number" class="num" name="${it.id}" min="${it.min}" max="${it.max}" step="${it.step}" inputmode="decimal"> <span class="unit">${esc(it.unit || "")}</span></div>`;
             } else if (it.type === "text") {

@@ -933,17 +933,17 @@
     first: {
       title: "Cognitive Performance Evaluation",
       html: `<p class="read-note read-first"><strong>Please read all instructions carefully.</strong></p>
-        <p>Your <strong>individual cognitive performance</strong> will now be <strong>evaluated</strong> under time pressure.</p>
-        <p>You will solve simple arithmetic problems. The time for each problem starts at <strong>{limit}</strong> and changes with your performance. Your accuracy will be <strong>compared with other participants</strong> in this study.</p>
-        <p>Enter each answer by clicking the on-screen keypad. The keyboard cannot be used in this task. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p>Your individual cognitive performance will now be evaluated under time pressure.</p>
+        <p>You will solve simple arithmetic problems, and each problem is timed. Your accuracy will be compared with that of other participants in this study.</p>
+        <p>Enter each answer by clicking the on-screen keypad. You cannot use the keyboard in this task. Sit still, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
         <p class="effort-note"><strong>Please give this task your full effort.</strong></p>`,
     },
     second: {
       title: "Cognitive Performance Evaluation",
       html: `<p class="read-note read-first"><strong>Please read all instructions carefully.</strong></p>
-        <p>Your <strong>individual cognitive performance</strong> will now be <strong>evaluated again</strong> under time pressure.</p>
-        <p>You will solve simple arithmetic problems. The time for each problem starts at <strong>{limit}</strong> and changes with your performance. Your accuracy will again be <strong>compared with other participants</strong> in this study.</p>
-        <p>Enter each answer by clicking the on-screen keypad. The keyboard cannot be used in this task. Sit still, get ready, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
+        <p>Your individual cognitive performance will now be evaluated under time pressure.</p>
+        <p>You will solve simple arithmetic problems, and each problem is timed. Your accuracy will be compared with that of other participants in this study.</p>
+        <p>Enter each answer by clicking the on-screen keypad. You cannot use the keyboard in this task. Sit still, and press <strong>I’m ready</strong> when you are prepared. The test starts only after you press it.</p>
         <p class="effort-note"><strong>Please give this task your full effort.</strong></p>`,
     },
     ready: "I’m ready",

@@ -1767,3 +1767,12 @@ table.matrix .lh-num { font-size: 19px; }
 .survey[data-instrument="VAS"] .qtext { font-size: 19px; font-weight: 600; color: var(--ink); margin-bottom: 0.25rem; }
 .survey[data-instrument="VAS"] .vas-prompt { margin: 0 0 0.2rem; font-size: 14px; }
 /* Attention-check rows look like any other row (no highlight) */
+
+/* ===================== v5.4 ===================== */
+/* Hospital-familiarity (and any hscale): PNA sits in the same question block, directly under the scale */
+.survey .hscale-block { display: flex; flex-direction: column; align-items: stretch; gap: 0.45rem; margin: 0.25rem 0 0.1rem; }
+.survey .hscale-block .hscale { margin: 0; }
+.survey .hscale-block .hs-pna { margin: 0; padding: 0; border: 0; }
+.survey .hs-pna .opt, .survey .pna-row .opt { display: inline-flex; }
+.survey .opts.opts-has-pna { flex-direction: column; align-items: flex-start; }
+.survey .pna-row { margin-top: 0.15rem; }
