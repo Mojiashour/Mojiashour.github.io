@@ -1,5 +1,5 @@
 /**
- * Wayfinding SPA v5.4 — text edits (welcome, instructions, math intro) and familiarity prefer-not fix; v5.3 had Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
+ * Wayfinding SPA v5.5 — compact 4-slider VAS page; v5.4 had text edits (welcome, instructions, math intro) and familiarity prefer-not fix; v5.3 had Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
  * "Your performance is being recorded"), 4 VAS sliders, I-PANAS-SF x3, STICSA Trait only + attention checks, NR-6,
  * MENE nature items, small-screen block, centred intro buttons, no per-part time estimates.
  * Wayfinding SPA v5.2 — advisor-meeting changes: wider frame / larger text / right-aligned primary buttons; read-delay countdown before every instruction
@@ -235,7 +235,7 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v5.4",
+    appVersion: "v5.5",
     participantId: "",
     participantIdSource: "",
     mode,
@@ -373,8 +373,8 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v54_";
-  const LEGACY_STORAGE_PREFIXES = ["wf_v53_", "wf_v48_", "wf_v44_"];
+  const STORAGE_PREFIX = "wf_v55_";
+  const LEGACY_STORAGE_PREFIXES = ["wf_v54_", "wf_v53_", "wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
     Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
@@ -3017,7 +3017,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v5.4 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.5 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -3067,7 +3067,7 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v5.4] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
+    console.log("[wayfinding v5.5] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
       trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
       showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,

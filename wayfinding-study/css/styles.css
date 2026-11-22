@@ -1776,3 +1776,43 @@ table.matrix .lh-num { font-size: 19px; }
 .survey .hs-pna .opt, .survey .pna-row .opt { display: inline-flex; }
 .survey .opts.opts-has-pna { flex-direction: column; align-items: flex-start; }
 .survey .pna-row { margin-top: 0.15rem; }
+
+/* ===================== v5.5 ===================== */
+/* Compact the 4-slider VAS page so the heading, intro, all four items and Continue
+   fit on one screen at 1280x720 without scrolling. Scope is VAS-only. */
+#screen-page.screen:has(.survey[data-instrument="VAS"]) {
+  padding-top: 0.75rem;
+  padding-bottom: 1rem;
+  overflow-y: auto;
+}
+.survey[data-instrument="VAS"] { padding: 16px 28px 14px; }
+.survey[data-instrument="VAS"] .kicker { margin-bottom: 6px; }
+.survey[data-instrument="VAS"] h2 { margin: 0 0 8px; }
+.survey[data-instrument="VAS"] .survey-instr { margin-bottom: 0.3rem; }
+.survey[data-instrument="VAS"] .vas-prompt {
+  margin: 0 0 0.55rem;
+  font-size: 13px;
+  color: var(--mute);
+  font-weight: 400;
+}
+.survey[data-instrument="VAS"] .q {
+  margin: 0 0 0.35rem;
+  padding: 0.4rem 0.7rem 0.3rem;
+}
+.survey[data-instrument="VAS"] .qtext {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+.survey[data-instrument="VAS"] .vas { margin: 0.1rem 0 0; }
+.survey[data-instrument="VAS"] .vas-track { height: 24px; }
+.survey[data-instrument="VAS"] .vas-track::before { top: 10px; height: 4px; }
+.survey[data-instrument="VAS"] .vas-thumb { top: 2px; height: 20px; }
+.survey[data-instrument="VAS"] .vas-ends {
+  margin-top: 0.1rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.survey[data-instrument="VAS"] .btn-row { margin-top: 10px; }
+.survey[data-instrument="VAS"] .survey-err { margin-top: 0.35rem; }
