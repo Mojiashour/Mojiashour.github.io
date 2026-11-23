@@ -1816,3 +1816,17 @@ table.matrix .lh-num { font-size: 19px; }
 }
 .survey[data-instrument="VAS"] .btn-row { margin-top: 10px; }
 .survey[data-instrument="VAS"] .survey-err { margin-top: 0.35rem; }
+
+/* ===================== v5.6 ===================== */
+/* Button names in body copy use bold in the body font, not the serif italic accent. */
+.consent-letter strong, .page strong, .dst-copy strong, .debrief-block strong, .survey-instr strong {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 700;
+}
+/* VAS: regular stem, bold feeling word; anchors stay bold; more space before item 1 */
+.survey[data-instrument="VAS"] .vas-prompt { margin: 0 0 16px; }
+.survey[data-instrument="VAS"] .qtext { font-weight: 400; }
+.survey[data-instrument="VAS"] .qnum { font-weight: 600; }
+.survey[data-instrument="VAS"] .qtext strong { font-weight: 700; color: var(--ink); }
+.survey[data-instrument="VAS"] .vas-ends { font-weight: 600; }

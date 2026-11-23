@@ -14,7 +14,7 @@
         <p class="irb-placeholder">[placeholder]</p>
 
         <h3>Agreement</h3>
-        <p>If you are 18 years of age or older, have read this information, and agree to take part, check the box below, enter today’s date, and select <em>I agree</em>. If you do not agree, select <em>I do not agree</em> and the session will end. If you are under 18, you are not eligible to take part; select <em>I am under 18</em>.</p>
+        <p>If you are 18 years of age or older, have read this information, and agree to take part, check the box below, enter today’s date, and select <strong>I agree</strong>. If you do not agree, select <strong>I do not agree</strong> and the session will end. If you are under 18, you are not eligible to take part; select <strong>I am under 18</strong>.</p>
       </div>`;
 
   window.WF_CONSENT_COPY = {

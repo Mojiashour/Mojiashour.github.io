@@ -11,6 +11,15 @@
 (function () {
   "use strict";
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  /** VAS display only: regular stem, bold feeling word. Logged itemText stays the plain string. */
+  function formatItemText(it) {
+    const text = String(it && it.text || "");
+    if (it && it.type === "vas") {
+      const m = /^(At this moment, do you feel )(.+?)(\?)$/.exec(text);
+      if (m) return esc(m[1]) + "<strong>" + esc(m[2]) + "</strong>" + esc(m[3]);
+    }
+    return esc(text);
+  }
 
   function shuffleSeeded(arr, rnd) {
     const a = arr.slice();
@@ -251,7 +260,7 @@
                 sec.options.map((o) => `<td><label class="cell"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"></label></td>`).join("") + "</tr>";
               return;
             }
-            html += `<div class="q" data-item="${it.id}">` + (it.hideText ? "" : `<div class="qtext">${it.type === "sam" ? "" : num} ${esc(it.text)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`);
+            html += `<div class="q" data-item="${it.id}">` + (it.hideText ? "" : `<div class="qtext">${it.type === "sam" ? "" : num} ${formatItemText(it)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`);
             if (it.hint) html += `<div class="qhint">${esc(it.hint)}</div>`;
             const opts = it.options || sec.options;
             if (it.type === "choice" && it.display === "hscale") {
