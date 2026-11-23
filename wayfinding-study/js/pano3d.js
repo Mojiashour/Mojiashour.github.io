@@ -1,19 +1,13 @@
 /**
- * Pano3D — minimal three.js 360 viewer for the wayfinding SPA (v2; v4: final-render sign geometry + boardFit; v4.3: view animation for corridor transitions).
+ * 360° panorama viewer for the Hospital Wayfinding Study (v5.7).
  *
- *  - Equirect panorama drawn on a large inverted sphere; the shader maps each view
- *    direction straight to equirect (u,v), so there is no sphere-tessellation error.
- *    Convention (same as the Blender renders / sign_overlay.json and Pannellum):
- *      yaw 0 = image centre, +yaw = right, +pitch = up.
- *  - The sign board is a real 3D quad placed at the blank sign's true position
- *    (camera at eye height 1.6 m, sign face 3.35 m ahead, 0.61 x 0.915 m, bottom 1.22 m),
- *    so it projects onto the blank sign exactly at every yaw/pitch/FOV (no parallax: the
- *    camera only rotates, it never translates).
- *  - Board texture: sRGB, mipmapped, max anisotropy. Non-emissive tone mapping in the
- *    shader (white -> ~wall white, slight top-lit gradient taken from the blank sign in
- *    the render) so the board reads as a lit object, not a glowing screen.
- *  - Textures are cached and pre-uploaded to the GPU (renderer.initTexture) so a trial
- *    switch is a uniform swap, not a load.
+ * Draws a pre-rendered equirectangular JPEG on an inverted sphere using three.js
+ * and places the sign board as a 3-D quad at the blank sign's true position, so
+ * it stays aligned at every yaw, pitch and field of view. The camera only rotates;
+ * it never translates. Board textures are cached and uploaded to the GPU ahead of
+ * each trial. Corridor transitions animate yaw, pitch and field of view.
+ *
+ * Import: ../vendor/three/three.module.min.js (MIT license, in that folder).
  */
 import * as THREE from "../vendor/three/three.module.min.js";
 
@@ -130,8 +124,7 @@ export class Pano3D {
     //  'panel' (default): sign-generator v1.5 panel-format boards (7:8 = 0.875) drawn at their own aspect at full
     //     panel height -> 1.1996 x 1.371 m, i.e. the panel is filled (0.2 mm per side) and nothing is stretched.
     //  'contain' (legacy 2:3 boards): full height, 0.914 m wide, centred (about 14 cm of panel each side).
-    //  'stretch' (legacy 2:3 boards): fills the whole panel, text 31% wider (comparison only).
-    const w = this.opts.boardFit === "stretch" ? S.xMax - S.xMin : Math.min(S.xMax - S.xMin, h * (this.opts.boardAspect || 700 / 800));
+    const w = Math.min(S.xMax - S.xMin, h * (this.opts.boardAspect || 700 / 800));
     // Blender world (x right, y forward, z up) -> three (x right, y up, -z forward)
     this.boardMat = new THREE.ShaderMaterial({
       uniforms: {

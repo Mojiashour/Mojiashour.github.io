@@ -1,7 +1,9 @@
 /**
- * v5.3 questionnaire content. Validated item wording is copied verbatim from the published instruments.
- * v5.3: 4-dimension VAS; I-PANAS-SF; STICSA Trait only (+ attention check); SBSOD attention check;
- * DEMO nature items (MENE-style); NR-6; English Yes/No only; no free-text "other" on gender/race.
+ * Questionnaire content for the Hospital Wayfinding Study (v5.7).
+ * Item wording is taken from the published instruments (VAS, I-PANAS-SF, STICSA Trait,
+ * NASA-TLX, SBSOD, SAS, EHI, NR-6) plus brief study-specific items (today's state,
+ * demographics). STICSA Trait and SBSOD include instructed-response attention checks
+ * that are logged and excluded from scale scores.
  */
 (function () {
   "use strict";
@@ -39,7 +41,6 @@
     ] }],
   };
 
-  // Norden et al. 2022 four VAS dimensions (replaces the single stress VAS everywhere).
   I.VAS = {
     id: "VAS", title: "Momentary feelings (VAS)", ref: "Norden et al. (2022), JMIR 24(7):e32280 (four VAS dimensions).",
     heading: "How you feel right now",
@@ -58,15 +59,6 @@
     ] }],
   };
 
-  // Kept for legacy session export only; not administered in v5.3.
-  I.STICSA_S = {
-    id: "STICSA_S", title: "STICSA – State", ref: "Ree, French, MacLeod & Locke (2008), Behav Cogn Psychother 36(3), 313–332.",
-    instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates:",
-    timeframe: "How you feel right now, at this moment",
-    required: true, layout: "matrix",
-    sections: [{ options: scale(["Not at all", "A little", "Moderately", "Very much so"]),
-      items: STICSA_ITEMS.map((t, i) => ({ id: "STS" + String(i + 1).padStart(2, "0"), text: t, type: "choice" })) }],
-  };
 
   const STICSA_T_ITEMS = STICSA_ITEMS.map((t, i) => ({ id: "STT" + String(i + 1).padStart(2, "0"), text: t, type: "choice" }));
   // Attention check after item 10 (instructed response; excluded from scale scores).
@@ -75,7 +67,7 @@
   });
 
   I.STICSA_T = {
-    id: "STICSA_T", title: "STICSA – Trait", ref: I.STICSA_S.ref,
+    id: "STICSA_T", title: "STICSA – Trait", ref: "Ree, French, MacLeod & Locke (2008), Behav Cogn Psychother 36(3), 313–332.",
     instructions: "Below is a list of statements which can be used to describe how people feel. Please read each statement carefully and select the option which best indicates:",
     timeframe: "How you generally feel, that is, how you feel most of the time",
     required: true, layout: "matrix",
@@ -242,8 +234,6 @@
   S.VAS = (r) => ({
     vas_stressed: r.VAS_stressed, vas_frustrated: r.VAS_frustrated,
     vas_overstrained: r.VAS_overstrained, vas_ashamed: r.VAS_ashamed,
-    // legacy single-slider key (v5.2 sessions)
-    vas_stress: r.VAS_stress,
   });
   const sticsa = (pre) => (r) => {
     const g = (n) => r[pre + String(n).padStart(2, "0")];
@@ -258,7 +248,6 @@
     }
     return out;
   };
-  S.STICSA_S = sticsa("STS");
   S.STICSA_T = sticsa("STT");
   S.IPANAS = (r) => {
     const paIds = ["alert", "inspired", "determined", "attentive", "active"].map((x) => "IPANAS_" + x);

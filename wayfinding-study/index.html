@@ -4,12 +4,12 @@
     <link rel="icon" href="data:," />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wayfinding Study v5.6</title>
-  <link rel="stylesheet" href="assets/fonts/fonts.css?v=56" />
-  <link rel="stylesheet" href="css/styles.css?v=56" />
+  <title>Wayfinding Study v5.7</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css?v=57" />
+  <link rel="stylesheet" href="css/styles.css?v=57" />
 </head>
 <body>
-  <div id="lab-banner" role="status">LAB MODE — markers stub</div>
+  <div id="lab-banner" role="status">LAB MODE</div>
   <div id="admin-bar" hidden>
     <span class="admin-pill">DEMO</span>
     <label class="admin-field">Transition
@@ -36,7 +36,7 @@
       <select id="admin-jump" aria-label="Jump to phase">
         <option value="">Jump to…</option>
         <option value="practice">Practice</option>
-        <option value="mist">DST (math)</option>
+        <option value="dst">DST (math)</option>
         <option value="condition1">Condition 1</option>
         <option value="post_condition">Post-condition</option>
         <option value="condition2">Condition 2</option>
@@ -56,13 +56,13 @@
 
   <header class="app-bar">
     <div class="study-wordmark">Hospital Wayfinding Study</div>
-    <h1>Hospital Wayfinding · v5.6</h1>
+    <h1>Hospital Wayfinding · v5.7</h1>
     <div class="meta" id="header-meta">mode: —</div>
   </header>
   <button type="button" id="btn-withdraw" class="withdraw-link" hidden>Withdraw</button>
 
   <main>
-    <!-- Generic page host: setup, consent, questionnaires, stress task, rest, experimenter screens -->
+    <!-- Page host: consent, questionnaires, arithmetic task, other text pages -->
     <section id="screen-page" class="screen active wide" aria-label="Study page">
       <div id="page-host"><p class="hint">Loading…</p></div>
     </section>
@@ -164,7 +164,7 @@
     <!-- End: participant results / debrief, plus experimenter tools when in lab or debug -->
     <section id="screen-end" class="screen participant-end" aria-label="Session complete">
       <div id="end-participant">
-        <!-- v5.2: loading screen -> compact results -> Continue -> final saved page -->
+        <!-- loading screen -> compact results -> Continue -> final saved page -->
         <div id="end-loading-view" class="end-view" hidden>
           <div class="end-spinner" role="status" aria-label="Loading"></div>
           <h2>Loading your <em>results</em>…</h2>
@@ -206,14 +206,14 @@
     </section>
   </main>
 
-  <script src="js/stimuli.js?v=56"></script>
-  <script src="js/instruments.js?v=56"></script>
-  <script src="js/survey.js?v=56"></script>
-  <script src="js/stress.js?v=56"></script>
-  <script src="js/consent_copy.js?v=56"></script>
-  <script src="js/export.js?v=56"></script>
-  <script src="js/backend.js?v=56"></script>
-  <script type="module" src="js/pano3d.js?v=56"></script>
-  <script src="js/app.js?v=56"></script>
+  <script src="js/stimuli.js?v=57"></script>
+  <script src="js/instruments.js?v=57"></script>
+  <script src="js/survey.js?v=57"></script>
+  <script src="js/stress.js?v=57"></script>
+  <script src="js/consent_copy.js?v=57"></script>
+  <script src="js/export.js?v=57"></script>
+  <script src="js/backend.js?v=57"></script>
+  <script type="module" src="js/pano3d.js?v=57"></script>
+  <script src="js/app.js?v=57"></script>
 </body>
 </html>

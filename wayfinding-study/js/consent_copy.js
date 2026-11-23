@@ -1,6 +1,8 @@
 /**
- * v5.3 consent copy — body cleared to [placeholder] pending Moj's IRB-approved text.
- * Agreement / age / date UI stays in app.js. CONSENT_TEXT_VERSION is logged with the decision.
+ * Consent page copy for the Hospital Wayfinding Study (v5.7).
+ * The consent body is still [placeholder] pending final approved language.
+ * The agreement, age confirmation and date fields are rendered by app.js.
+ * CONSENT_TEXT_VERSION is stored with the participant's decision.
  */
 (function () {
   "use strict";

@@ -1,72 +1,34 @@
 /**
- * Wayfinding SPA v5.6 — consent button names in bold (not italic) and VAS stem weight; v5.5 had compact 4-slider VAS page; v5.4 had text edits (welcome, instructions, math intro) and familiarity prefer-not fix; v5.3 had Moj's text edits (Study_Texts doc), Norden adaptive math (3 s start, keypad shuffle, keypad only,
- * "Your performance is being recorded"), 4 VAS sliders, I-PANAS-SF x3, STICSA Trait only + attention checks, NR-6,
- * MENE nature items, small-screen block, centred intro buttons, no per-part time estimates.
- * Wayfinding SPA v5.2 — advisor-meeting changes: wider frame / larger text / right-aligned primary buttons; read-delay countdown before every instruction
- * page's primary button; reworded welcome, math-assessment intro (no auto-start), destination intro; first 3 practice intersections untimed then 3 s
- * (practiceTiming logged); red per-decision timer bar (subtle overall progress); recall-probe -> next intersection uses the normal arrival animation;
- * questionnaire headings removed, sleep/age dropdowns, horizontal familiarity scale, demographics occupation item removed; "Exclude my data" removed;
- * end flow = loading screen -> compact 4-box results -> final "saved" page (all v5.1 safeguards kept).
- * Wayfinding SPA v5.1 — v5.1 adds neutral "response registered" feedback (chosen side highlighted + "✓ Left"/"✓ Right" pill, same for
- * every choice, never correct/incorrect) at intersections (RESPONSE_ACK_MS) and recall probes (PROBE_ACK_MS); extra presses during
- * the feedback window are ignored and logged as "response_ignored". RT is stamped at the press, before any feedback is drawn.
- * (v5.0:) data output only: <pid>_questionnaires.csv (long, one row per timepoint) + <pid>_trials.csv + raw/ folder (js/export.js);
- *   SAM removed; conditionOrder written as Nature_first / Poster_first. Task, timing and randomisation logic are identical to v4.9.
- * Wayfinding SPA v4.9 — per-intersection decision time limit (default 3 s) and DST per-item limit (default 5 s). All v4.8 SOP 16 / withdraw / 18+ / fonts changes kept.
- * Wayfinding SPA v4.8 — SOP 16 consent/eligibility, withdraw, self-hosted fonts; walk default and DST kept from v4.7.
- * Wayfinding SPA v4.7 — DST-style math stress (Norden et al., 2022); walk (W) is the participant default.
- * Wayfinding SPA v4.6.1 — WI transition (walk + dark iris).
- * Wayfinding SPA v4.6 — admin/demo mode, transition styles (A/A+/B/C/W), dated participant IDs.
- * Wayfinding SPA v4.5 — visual restyle (minimal study design language); task logic unchanged from v4.4.
- * Wayfinding SPA v4.4 — full session: intro, consent, today's-state questions, questionnaires, practice,
- * a stress induction before each
- * wayfinding condition, Nature + Poster(Abstract) conditions on the FINAL 6000x3000 renders, a short
- * corridor-transition animation after each left/right choice, per-block stress sliders, a debrief
- * (comparison bar was not real) then a single end-of-session performance summary (Part 1 / Part 2,
- * no condition names), post-experiment measures, export.
- * Trial logic (mulberry32 seed, 3 blocks x 14 trials per condition, 3 lag-3 recall probes per block, board
- * table seed 20261007, CSV columns) is unchanged from v3 apart from what is listed in README_v4.4.md.
+ * Hospital Wayfinding Study v5.7
  *
- * URL options (combine with &)
- *   ?mode=lab | remote        lab = EEG/ECG marker hook + experimenter setup/rest screens (default remote)
- *   ?pid=TEST_ABC            optional study code (testing); otherwise auto-assigned / lab typed
- *   ?seed=12345               participant randomisation seed (default random, logged)
- *   ?order=NA | AN            condition order (default: derived from a hash bit of the random participant ID)
- *   ?res=6k | 4k              panorama derivative (default 6k = 6000x3000 JPEG; 4k = 4096x2048)
- *   ?trialsPerBlock=4         pilot / debugging (default 14)
- *   ?dstSec=90                duration of each DST math block in seconds (default 90; ?mistSec is an alias)
- *   ?dstLimitMs=3000          STARTING per-problem time limit in ms (default 3000, Norden et al.); adapts x0.9 / x1.1
- *   ?dstAvg=75                fixed comparison-average marker (default 75, as in Norden et al.)
- *   ?legacyMist=1             use the previous adaptive MIST-style block instead of the DST
- *   ?mistSec=90               alias for ?dstSec=; also used if ?legacyMist=1
- *   ?mistPracticeSec=40       untimed MIST practice when ?legacyMist=1 (default 40; 0 skips practice)
- *   ?mistAvg=85               MIST average marker when ?legacyMist=1 (clamped 80–90)
- *   ?mistMsg=1                brief negative-evaluative messages in the legacy MIST block (default off)
- *   ?decisionLimit=3000       per-intersection decision time limit in ms (default 3000; 0 = off). Starts when the
- *                             decision clock starts (scene fully visible + DECISION_DELAY_MS), never during a transition.
- *   ?decisionLimitPractice=0  do not apply the decision limit during practice (default: applied, so people learn it)
- *   ?decisionTimeoutFeedbackMs=700  duration of the “Time’s up” message after a timeout (default 700)
- *   ?trans=2200               total exit+entry corridor transition in ms (default 2200 walking pace; 0 disables)
- *   ?fov=102                  horizontal field of view in degrees (default 102; was 90 in v4.3)
- *   ?prep=1                   use the legacy anticipatory-prep screen instead of the DST
- *   ?prepSec=45               duration of that legacy prep screen (default 45; the old 120 s default is gone)
- *   ?liveStress=1             use the legacy live serial-subtraction module (failure feedback) instead of the DST
- *   ?endMath=1                optional short arithmetic task at the end (default off)
- *   ?mathSec=120              duration of the end arithmetic task when endMath=1 (default 120)
- *   ?stressSec=300            duration of the legacy live stress task when liveStress=1 (default 300)
- *   ?summary=0                hide the end-of-session performance summary (default shown at the end only)
- *   ?rest=180                 resting-baseline duration in s (default 180 in lab mode, 0 in remote)
- *   ?restBaseline=180         override resting-baseline only (defaults to ?rest=)
- *   ?restBetween=180          between-condition rest in s (default 0; off because a second induction follows)
- *   ?skipQ=1                  skip all questionnaires (task testing only; logged)
- *   ?interview=1              show the experimenter interview-notes screen (default on in lab, off in remote)
- *   ?interview=0              hide it even in lab
- *   ?boardFit=panel|contain|stretch  sign board on the 1.20 x 1.371 m panel. Default panel = sign-generator v1.5
- *                             panel-format boards (assets/boards_panel/, 0.875:1) filling the panel, no stretching.
- *                             contain / stretch = the old v1.4 2:3 boards (assets/boards/): full height with ~14 cm
- *                             side gaps / stretched 31% wider (comparison only)
- *   ?abstract=real|placeholder|disabled   Poster condition source (default real = R01–R07_PST finals)
- *   ?tone=off  ?oversize=1.015  ?resident=all  ?debug=1   (as in v3)
+ * An online 360° wayfinding experiment. Participants view pre-rendered hospital
+ * panoramas, choose left or right at each intersection (3-second limit), and
+ * complete questionnaires plus a brief timed arithmetic task (Norden et al., 2022).
+ * Two cue conditions (a nature green wall vs. a poster) are compared within subjects.
+ *
+ * The app is static files. A session snapshot is stored in localStorage, then the
+ * files are POSTed to a Google Apps Script backend which writes them to Drive.
+ *
+ * URL options (combine with &):
+ *   ?mode=lab|remote     lab: experimenter can enter a study code, and the welcome
+ *                        page notes that the experimenter will be nearby (default remote)
+ *   ?pid=CODE            optional study code (otherwise assigned automatically)
+ *   ?seed=12345          randomisation seed (default random, logged)
+ *   ?order=NA|AN         condition order (default: from a hash of the study code)
+ *   ?trialsPerBlock=14   decisions per destination block (default 14)
+ *   ?dstSec=90           duration of each arithmetic block in seconds (default 90)
+ *   ?dstLimitMs=3000     starting per-problem time limit in ms (default 3000; then adapts)
+ *   ?dstAvg=75           fixed comparison-average marker (default 75)
+ *   ?decisionLimit=3000  per-intersection time limit in ms (default 3000; 0 = off)
+ *   ?decisionLimitPractice=0  do not apply the limit during practice (default: applied)
+ *   ?decisionTimeoutFeedbackMs=700  duration of the “Time’s up” message (default 700)
+ *   ?trans=2200          corridor transition duration in ms (default 2200; 0 disables)
+ *   ?fov=102             horizontal field of view in degrees (default 102)
+ *   ?skipQ=1             skip questionnaires (testing only; logged)
+ *   ?summary=0           hide the end-of-session performance summary
+ *   ?debug=1             show experimenter download tools
+ *   ?allowSmall=1        allow a small or touch-only window (tests only)
+ *   ?readDelay=1         instruction-button read-delay scale (default 1; 0 disables)
  */
 (function () {
   "use strict";
@@ -76,85 +38,57 @@
   const modeParam = (params.get("mode") || "remote").toLowerCase();
   const mode = modeParam === "lab" ? "lab" : "remote";
   const DEBUG = params.get("debug") === "1";
-  const RES = params.get("res") === "6k" ? "6k" : "4k"; // hosted/default 4k
-
-  function stressModeFromParams() {
-    if (params.get("liveStress") === "1") return "live";
-    if (params.get("prep") === "1") return "anticipatory";
-    if (params.get("legacyMist") === "1") return "mist";
-    return "dst";
-  }
 
   const CONFIG = {
-    END_MIN_LOAD_MS: Math.max(0, num("loadMs", 1500)),     // v5.2: minimum time the "Loading your results" screen stays up
-    READ_DELAY_SCALE: Math.max(0, num("readDelay", 1)),   // v5.2: 1 = full countdown before instruction buttons enable; 0 disables (tests only)
-    RESPONSE_ACK_MS: Math.max(0, num("ackMs", 350)),      // v5.1: neutral "choice registered" feedback at intersections (shown over the exit walk; no added delay)
-    PROBE_ACK_MS: Math.max(0, num("probeAckMs", 450)),    // v5.1: same for recall probes (replaces the old silent 350 ms wait)
+    END_MIN_LOAD_MS: Math.max(0, num("loadMs", 1500)),
+    READ_DELAY_SCALE: Math.max(0, num("readDelay", 1)),
+    RESPONSE_ACK_MS: Math.max(0, num("ackMs", 350)),
+    PROBE_ACK_MS: Math.max(0, num("probeAckMs", 450)),
     DECISION_DELAY_MS: 500,
     PROBE_DELAY_MS: 500,
     PROBE_LAG: 3,
     PROBES_PER_BLOCK: 3,
     PROBE_MIN_SPACING: 3,
     TRIALS_PER_BLOCK: num("trialsPerBlock", 14),
-    HFOV: Math.max(70, Math.min(140, num("fov", 102))), // v4.4: zoomed out vs 90°; ?fov= overrides
+    HFOV: Math.max(70, Math.min(140, num("fov", 102))),
     START_YAW: 0,
     START_PITCH: 0,
-    ABSTRACT_MODE: ["placeholder", "disabled"].includes(params.get("abstract")) ? params.get("abstract") : "real",
-    SIGN_OVERSIZE: num("oversize", 1.015),
-    BOARD_FIT: ["contain", "stretch"].includes(params.get("boardFit")) ? params.get("boardFit") : "panel",
-    GPU_WINDOW: params.get("resident") === "all" ? Infinity : Math.max(2, num("resident", 3)),
-    TONE: { on: params.get("tone") !== "off", lift: 0.1, gain: 0.88, shadeStrength: 0.4 },
-    RES,
-    PANO_DIR: `assets/pano/${RES}/`,
-    // v4 panel boards (sign-generator v1.5, 1400x1600, 7:8) or the legacy v1.4 2:3 boards (1200x1800)
-    BOARD_DIR: ["contain", "stretch"].includes(params.get("boardFit")) ? "assets/boards/" : "assets/boards_panel/",
-    BOARD_ASPECT: ["contain", "stretch"].includes(params.get("boardFit")) ? 2 / 3 : 700 / 800,
+    ABSTRACT_MODE: "real",
+    SIGN_OVERSIZE: 1.015,
+    BOARD_FIT: "panel",
+    GPU_WINDOW: 3,
+    TONE: { on: true, lift: 0.1, gain: 0.88, shadeStrength: 0.4 },
+    RES: "4k",
+    PANO_DIR: "assets/pano/4k/",
+    BOARD_DIR: "assets/boards_panel/",
+    BOARD_ASPECT: 700 / 800,
     SKIP_Q: params.get("skipQ") === "1",
-    REST_S: num("rest", mode === "lab" ? 180 : 0), // convenience alias; sets the baseline rest default only
-    REST_BASELINE_S: num("restBaseline", num("rest", mode === "lab" ? 180 : 0)),
-    REST_BETWEEN_S: num("restBetween", 0), // default off: a second induction follows condition 1
-    INTERVIEW: params.get("interview") === "1" || (mode === "lab" && params.get("interview") !== "0"),
-    SCREEN_ITEM13_EXCLUDES: false, // docx: item 13 excludes only if the investigator adopts it
-    MRT: "pending", // UNDECIDED (Peters MRT-A needs answer key + permission): no MRT items are included
-    SHOW_SUMMARY: params.get("summary") !== "0", // shown once at the end, never after each condition
-    STRESS_MODE: stressModeFromParams(), // default dst; ?legacyMist=1, ?prep=1 or ?liveStress=1 select legacy modules
-    PREP_S: num("prepSec", 45), // used only when STRESS_MODE === "anticipatory"; 2-minute default removed
-    DST_S: num("dstSec", num("mistSec", 90)),
-    DST_LIMIT_MS: num("dstLimitMs", 3000), // v5.3: Norden et al. start value; the limit then adapts (stress.js)
+    SCREEN_ITEM13_EXCLUDES: false,
+    MRT: "pending",
+    SHOW_SUMMARY: params.get("summary") !== "0",
+    STRESS_MODE: "dst",
+    DST_S: num("dstSec", 90),
+    DST_LIMIT_MS: num("dstLimitMs", 3000),
     DST_AVG: Math.max(0, Math.min(100, num("dstAvg", 75))),
     DST_ANTICIPATION_MIN_S: num("dstAnticipationMinSec", 20),
     DST_ANTICIPATION_MAX_S: num("dstAnticipationMaxSec", 30),
     DST_COUNTDOWN_S: num("dstCountdownSec", 3),
-    MIST_S: num("mistSec", num("dstSec", 90)), // legacy MIST only
-    MIST_PRACTICE_S: num("mistPracticeSec", 40),
-    MIST_AVG: Math.max(80, Math.min(90, num("mistAvg", 85))),
-    MIST_EVAL_MESSAGES: params.get("mistMsg") === "1",
-    // v4.4 two-sided walking transition: ?trans= is TOTAL exit+entry duration (~2–2.5 s default).
-    TRANS_MS: num("trans", 2200), // 0 disables both halves
-    TRANS_YAW: num("transYaw", 32), // exit turn amplitude
-    TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)), // exit mid zoom (~78% of base)
-    // Entry starts slightly WIDE then narrows to base FOV (continues forward motion; not zoom-out/backwards).
-    /* v4.4-forward-entry */
+    TRANS_MS: num("trans", 2200),
+    TRANS_YAW: num("transYaw", 32),
+    TRANS_HFOV: num("transHfov", Math.round(Math.max(70, Math.min(140, num("fov", 102))) * 0.78)),
     TRANS_ENTER_HFOV: num("transEnterHfov", Math.min(140, Math.round(Math.max(70, Math.min(140, num("fov", 102))) + 14))),
-    TRANS_BOB: num("transBob", 0.55), // low-amplitude walking bob
-    TRANS_BOB_CYCLES: num("transBobCycles", 2.2), // ~2 steps/sec over each half (~1.1 s)
-    TRANS_OUT_FRAC: 0.55, // exit share of TRANS_MS; entry gets the rest
-    // v4.7 participant default is walk (W); ?transStyle= or the admin dropdown can change it.
+    TRANS_BOB: num("transBob", 0.55),
+    TRANS_BOB_CYCLES: num("transBobCycles", 2.2),
+    TRANS_OUT_FRAC: 0.55,
     DEFAULT_TRANS_STYLE: "W",
-    // WI = walk + dark iris. Exit walk ~1 s; entry iris-open ~450 ms. Total ~1.45 s.
     WI_OUT_MS: 1000,
     WI_IN_MS: 450,
-    END_MATH: params.get("endMath") === "1", // default off
-    END_MATH_S: num("mathSec", 120),
     WORDING_VERSION: "DRAFT_IRB_2026-11-11_v49",
-    // v4.9: per-intersection decision limit. 0 disables. Applied in practice by default (easy to turn off).
     DECISION_LIMIT_MS: num("decisionLimit", 3000),
     DECISION_LIMIT_IN_PRACTICE: params.get("decisionLimitPractice") !== "0",
-    PRACTICE_UNTIMED_N: Math.max(0, num("practiceUntimed", 3)), // v5.2: the first N practice intersections have no time limit, the rest use the 3 s limit
+    PRACTICE_UNTIMED_N: Math.max(0, num("practiceUntimed", 3)),
     PRACTICE_MIN_TIMED: 2,
     DECISION_TIMEOUT_FEEDBACK_MS: Math.max(0, num("decisionTimeoutFeedbackMs", 700)),
-    STRESS: { START: 1022, STEP: 13, DURATION_S: num("stressSec", 300), LIMIT0_MS: 7000, LIMIT_MIN_MS: 2500,
-      LIMIT_MAX_MS: 10000, FEEDBACK_MS: 900, ADAPT_N: 3 },
   };
 
   // layout token (sign-generator CSV `layout`) -> FINAL render ids (file names in assets/pano/<res>/)
@@ -162,19 +96,16 @@
     L: "R01_NAT_L", R: "R02_NAT_R", Both: "R03_NAT_Both", On: "R04_NAT_On",
     OnL: "R05_NAT_OnL", OnR: "R06_NAT_OnR", OnBoth: "R07_NAT_OnBoth",
   };
-  // Poster condition = the "Abstract" condition of the board codebook (condition value stays "Abstract").
-  // v2/v3 reserved R08–R14 for it; the finals are named R01–R07_PST (same layout order).
+  // Poster condition. Internal condition value remains "Abstract".
   const ABSTRACT_RENDERS = {
     L: "R01_PST_L", R: "R02_PST_R", Both: "R03_PST_Both", On: "R04_PST_On",
     OnL: "R05_PST_OnL", OnR: "R06_PST_OnR", OnBoth: "R07_PST_OnBoth",
   };
   const LEGACY_SCENE_ID = { R01_PST_L: "R08", R02_PST_R: "R09", R03_PST_Both: "R10", R04_PST_On: "R11",
     R05_PST_OnL: "R12", R06_PST_OnR: "R13", R07_PST_OnBoth: "R14" };
-  const ABSTRACT_PLACEHOLDER_RENDER = "R16_TRN_Sign";
   const COND_LABEL = { Nature: "Nature", Abstract: "Poster" };
 
-  // Training: T1 wall, T2 green-wall cue, T2P poster cue (v4, added because the Poster finals now exist; the cue of the
-  // participant's first condition is shown first), T3/T4 sign with the Admissions boards.
+  // Practice: T1 wall, T2 green-wall cue, T2P poster cue (first-condition cue first), T3/T4 sign.
   const TRAINING_BASE = {
     T1: { trainingId: "T1", renderId: "R15_TRN_Wall", boardId: null, correctDirection: "",
       prompt: "Practice: there is no sign here. Choose either direction with ← or →." },
@@ -189,7 +120,7 @@
   };
   let TRAINING = [];
 
-  const WFX = window.WF_EXPORT; // v5.0 export + label helpers (js/export.js)
+  const WFX = window.WF_EXPORT;
   const STIM = window.WF_STIMULI;
   const INSTR = window.WF_INSTRUMENTS;
   const SCORE = window.WF_SCORING;
@@ -235,12 +166,12 @@
   let transitionBusy = false; // true from exit start until entry finishes; choices ignored
 
   const session = {
-    appVersion: "v5.6",
+    appVersion: "v5.7",
     participantId: "",
     participantIdSource: "",
     mode,
     seed: null,
-    dstSeed: null, // v5.0: seed of the generated DST arithmetic items (the 2nd block uses dstSeed ^ 0x9e3779b9)
+    dstSeed: null, // second arithmetic block uses dstSeed ^ 0x9e3779b9
     conditionOrder: "",
     conditionOrderSource: "",
     abstractMode: CONFIG.ABSTRACT_MODE,
@@ -249,7 +180,7 @@
     startedAt: null,
     completedAt: null,
     endReason: "",
-    // privacy: no user agent, IP, names, contact details or dates of birth are collected (README_v4.md)
+    // no user agent, IP, names, contact details or dates of birth are collected
     display: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
     config: CONFIG,
     consent: null,
@@ -261,10 +192,9 @@
     trials: [],
     responses: [],   // questionnaire items, long format
     scores: [],      // one row per questionnaire administration
-    stress: { mode: CONFIG.STRESS_MODE, preps: [], live: null, endMath: null, mist: { practice: null, segments: [], state: {} }, dst: { anticipation: [], segments: [] }, debriefShown: false },
+    stress: { mode: CONFIG.STRESS_MODE, dst: { anticipation: [], segments: [] }, debriefShown: false },
     summaries: [],
-    interview: null,
-    events: [],      // every phase / instruction / trial marker, always logged (lab mode also sends to the hook)
+    events: [],      // every phase / instruction / trial marker
   };
 
   const $ = (id) => document.getElementById(id);
@@ -373,8 +303,8 @@
   let pendingWithdraw = false;
   let withdrawArmed = false;
   let skipConditionFlag = false;
-  const STORAGE_PREFIX = "wf_v56_";
-  const LEGACY_STORAGE_PREFIXES = ["wf_v55_", "wf_v54_", "wf_v53_", "wf_v48_", "wf_v44_"];
+  const STORAGE_PREFIX = "wf_v57_";
+  const LEGACY_STORAGE_PREFIXES = ["wf_v56_", "wf_v55_", "wf_v54_", "wf_v53_", "wf_v48_", "wf_v44_"];
   const adminWaiters = new Set();
   function adminSignal(kind, detail) {
     Array.from(adminWaiters).forEach((fn) => { try { fn(kind, detail); } catch (e) { console.error(e); } });
@@ -411,7 +341,6 @@
     if (session.consent && session.consent.decision === "agreed") return true;
     const dst = session.stress && session.stress.dst;
     if (dst && ((dst.segments && dst.segments.length) || (dst.anticipation && dst.anticipation.length))) return true;
-    if (session.stress && session.stress.mist && session.stress.mist.segments && session.stress.mist.segments.length) return true;
     if (session.trials && session.trials.length) return true;
     return false;
   }
@@ -471,6 +400,7 @@
   }
   function requestJump(target) {
     if (!target) return;
+    if (target === "mist") target = "dst";
     pendingJump = target;
     skipConditionFlag = true;
     logEvent("admin_jump", { target: target, phase: currentPhase });
@@ -571,18 +501,13 @@
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  /** Every marker is logged; in lab mode it is also passed to window.WF_MARKER_HOOK (EEG/ECG trigger bridge stub). */
   function logEvent(type, extra) {
     const evt = { seq: ++eventSeq, event: type, phase: currentPhase, perf: +performance.now().toFixed(1), timestamp: isoNow(),
       trialIndex: currentEvent && currentEvent.trialIndex != null ? currentEvent.trialIndex : "", ...extra };
     session.events.push(evt);
-    if (mode === "lab") {
-      console.log("[marker]", evt);
-      if (typeof window.WF_MARKER_HOOK === "function") { try { window.WF_MARKER_HOOK(evt); } catch (e) { console.error(e); } }
-    }
     return evt;
   }
-  const pushMarker = logEvent; // v3 name used by the trial code
+  const pushMarker = logEvent;
 
   /* ---------------- autosave (localStorage + pluggable backend) ---------------- */
   let serverOk = null;
@@ -601,7 +526,7 @@
     };
     let files;
     try { files = exportFiles(); } catch (err) {
-      // v5.1: an export bug must never block the study or the end screen; save the raw session instead.
+      // an export bug must never block the study or the end screen; save the raw session instead.
       console.error("[export]", err);
       logEvent("export_error", { message: String(err && err.message || err) });
       files = { ["raw/" + session.participantId + "_session.json"]: JSON.stringify(session, null, 2) };
@@ -738,9 +663,9 @@
       (id_hash_bit; 1 = NA, 0 = AN). The RNG draw is still consumed so trial orders for a given
       seed do not depend on the source. The source and bit are logged. */
   function chooseOrder(rnd) {
-    const draw = rnd(); // always consumed (as in v3) so block/trial orders for a given seed do not depend on the source
+    const draw = rnd(); // always consumed so block/trial orders for a given seed do not depend on the source of `order`
     const pRaw = params.get("order");
-    const p = pRaw === "Nature_first" ? "NA" : pRaw === "Poster_first" ? "AN" : pRaw; // v5.0: labels accepted too
+    const p = pRaw === "Nature_first" ? "NA" : pRaw === "Poster_first" ? "AN" : pRaw;
     if (p === "NA" || p === "AN") return { order: p, source: "url", idBit: orderBit(session.participantId) };
     const bit = orderBit(session.participantId || "");
     return { order: bit ? "NA" : "AN", source: "id_hash_bit", idBit: bit };
@@ -750,13 +675,13 @@
 
   function buildPlan(seed) {
     const rnd = mulberry32(seed);
-    let order = "N", orderSource = "abstract_disabled";
-    if (CONFIG.ABSTRACT_MODE !== "disabled") { const o = chooseOrder(rnd); order = o.order; orderSource = o.source; }
+    const o = chooseOrder(rnd);
+    const order = o.order, orderSource = o.source;
     const conds = order.split("").map((c) => (c === "N" ? "Nature" : "Abstract"));
     TRAINING = ["T1"].concat(order[0] === "A" ? ["T2P", "T2"] : ["T2", "T2P"], ["T3", "T4"])
-      .filter((t) => !(t === "T2P" && CONFIG.ABSTRACT_MODE !== "real")).map((t) => TRAINING_BASE[t]);
-    // v5.2: first PRACTICE_UNTIMED_N practice intersections are untimed (look around freely); then a "3 seconds from now on"
-    // screen; the remaining practice intersections are timed (at least PRACTICE_MIN_TIMED, repeating the sign boards if needed).
+      .map((t) => TRAINING_BASE[t]);
+    // First PRACTICE_UNTIMED_N practice intersections are untimed; then a "3 seconds from now on"
+    // screen; the remaining practice intersections are timed (at least PRACTICE_MIN_TIMED, repeating sign boards if needed).
     const trainingSeq = TRAINING.slice();
     // (TRAINING is replaced by trainingSeq below so progress/preload use the final practice list)
     if (CONFIG.PRACTICE_UNTIMED_N > 0) {
@@ -799,14 +724,13 @@
           destination: dest, level: boards[0].dest_level });
         trials.forEach((b, i) => {
           trialIndex++;
-          const placeholder = cond === "Abstract" && CONFIG.ABSTRACT_MODE === "placeholder";
           queue.push({ kind: "decision", isPractice: false, trialIndex, trainingId: "",
             condition: cond, conditionPosition: ci + 1, block: blockNo, blockOrder: bi + 1, blockPos: i + 1,
-            renderId: placeholder ? ABSTRACT_PLACEHOLDER_RENDER : intendedRender(cond, b.layout),
+            renderId: intendedRender(cond, b.layout),
             intendedRenderId: intendedRender(cond, b.layout),
             boardId: b.board_id, correctDirection: b.correct_side, destination: b.destination,
             prompt: `Find the way to ${b.destination}. Press ← or →.`,
-            stimulusPlaceholder: placeholder ? 1 : 0, nDecisionsInBlock: n });
+            stimulusPlaceholder: 0, nDecisionsInBlock: n });
           if (probeAfter.indexOf(i + 1) >= 0) {
             probeSerial++;
             queue.push({ kind: "probe", trialIndex: 1000 + probeSerial, isPractice: false,
@@ -850,7 +774,7 @@
     return urls;
   }
 
-  /* ---------------- v5.1: neutral response-registered feedback ---------------- */
+  /* ---------------- response-registered feedback ---------------- */
   let ackTimer = null, lastResponsePerf = 0, ackShownPerf = 0;
   function showResponseAck(choice, ms) {
     const el = $("response-ack");
@@ -1123,7 +1047,7 @@
     $("intro-prompt").textContent = spec.isPractice && spec.practiceIntro ? "Practice" : `Your destination: ${spec.destination}`;
     $("intro-sub").textContent = "Press Space or click Continue to start.";
     showScreen("trial");
-    // v5.2: brief read delay before the intro can be dismissed (Space and the Continue button both locked)
+    // brief read delay before the intro can be dismissed (Space and the Continue button both locked)
     const introSecs = (adminMode || CONFIG.READ_DELAY_SCALE <= 0) ? 0 : Math.max(1, Math.round((spec.practiceIntro ? 5 : 3) * CONFIG.READ_DELAY_SCALE));
     const introBtn = $("btn-intro-continue");
     if (introSecs > 0) {
@@ -1395,7 +1319,7 @@
   }
 
   /**
-   * v5.2: "leave" half after a recall probe. The probe screen has no corridor to walk out of, so cover the screen
+   * Leave-half after a recall probe. The probe screen has no corridor to walk out of, so cover the screen
    * with the same overlay the other styles end on; the next intersection then plays the normal arrival (playEnterTransition).
    */
   async function playProbeExitTransition() {
@@ -1702,7 +1626,7 @@
     Promise.resolve()
       .then(() => playExitTransition(walkDir))
       .catch((err) => { console.error("[transition]", err); clearTransitionVisuals(); })
-      .then(() => (ackTimer ? sleepUntilAckDone(CONFIG.RESPONSE_ACK_MS) : null)) // v5.1: only waits if the exit walk was shorter than the feedback (e.g. ?trans=0)
+      .then(() => (ackTimer ? sleepUntilAckDone(CONFIG.RESPONSE_ACK_MS) : null)) // only waits if the exit walk was shorter than the feedback (e.g. ?trans=0)
       .then(() => {
         if (currentEvent !== ev) return;
         resetResponseState();
@@ -1825,7 +1749,7 @@
       if (currentEvent !== ev) return;
       const next = peekNextEvent();
       if (next && next.kind === "decision") {
-        // v5.2: the next intersection arrives with the same animation as after a normal decision (it used to just pop in)
+        // the next intersection arrives with the same animation as after a normal decision (it used to just pop in)
         try { await playProbeExitTransition(); } catch (err) { console.error("[probe-transition]", err); clearTransitionVisuals(); }
       }
       if (currentEvent !== ev) return;
@@ -1857,7 +1781,7 @@
   }
 
   /** a simple page with HTML body and buttons; resolves with the id of the button pressed */
-  /* v5.2: instruction pages get a short countdown before the primary button enables (scaled to text length, ~5-15 s). */
+  /* Instruction pages get a short countdown before the primary button enables (scaled to text length, ~5–15 s). */
   function readDelaySeconds(words) {
     if (adminMode || CONFIG.READ_DELAY_SCALE <= 0 || words < 10) return 0;
     return Math.max(1, Math.round(Math.min(15, Math.max(5, Math.ceil(words / 9))) * CONFIG.READ_DELAY_SCALE));
@@ -1905,7 +1829,7 @@
         else if (kind === "skip") done("admin-skip");
         else if (kind === "withdraw") done("withdraw");
       });
-      // v5.3: "Please read all instructions carefully." is the first line of the page (Moj's doc)
+      // "Please read all instructions carefully." is the first line of the page (Moj's doc)
       const rn = READ_NOTE.replace('class="read-note"', 'class="read-note read-first"');
       const body = !o.readNote ? html : (html.indexOf("</h2>") >= 0 ? html.replace("</h2>", "</h2>" + rn) : rn + html);
       pageHost().innerHTML = `<div class="page ${o.cls || ""}">${body}<div class="btn-row">` +
@@ -1958,7 +1882,7 @@
       phase: currentPhase, administration, ...(extra || {}) };
     (res.rows || []).forEach((r) => session.responses.push({ ...ctx, ...r }));
     const sc = SCORE[instId] ? SCORE[instId](res.values || {}, { screenItem13Excludes: CONFIG.SCREEN_ITEM13_EXCLUDES }) : {};
-    if (sc && sc.attn_pass !== undefined) { // v5.3 instructed-response attention checks (STICSA Trait, SBSOD)
+    if (sc && sc.attn_pass !== undefined) { // instructed-response attention checks (STICSA Trait, SBSOD)
       session.attention = session.attention || {};
       session.attention[instId] = { pass: sc.attn_pass, value: sc.attn_value, administration };
       session.attention.fail_count = Object.keys(session.attention).filter((k) => k !== "fail_count" && session.attention[k].pass === 0).length;
@@ -2049,33 +1973,6 @@
     };
   }
 
-  function restScreen(label, durationS) {
-    const dur = durationS != null ? durationS : CONFIG.REST_S;
-    if (!dur) return Promise.resolve();
-    return new Promise((resolve) => {
-      const t0 = performance.now();
-      logEvent("rest_onset", { label, duration_s: dur });
-      pageHost().innerHTML = `<div class="page rest"><div class="fixation">+</div>
-        <p class="hint">Please sit still, relax, and look at the cross. The screen will continue automatically.</p>
-        <p class="hint exp-note">Experimenter: Esc skips.</p></div>`;
-      showScreen("page");
-      let tm = null;
-      let offAdmin = null;
-      const end = (skipped) => {
-        if (end._done) return;
-        end._done = true;
-        clearTimeout(tm); document.removeEventListener("keydown", onKey);
-        if (typeof offAdmin === "function") offAdmin();
-        logEvent("rest_offset", { label, skipped: skipped ? 1 : 0, actual_ms: Math.round(performance.now() - t0) });
-        resolve();
-      };
-      const onKey = (e) => { if (e.key === "Escape" && adminMode) end(true); };
-      document.addEventListener("keydown", onKey);
-      offAdmin = onAdminSignal((kind) => { if (kind === "skip" || kind === "jump") end(true); });
-      tm = setTimeout(() => end(false), dur * 1000);
-    });
-  }
-
   function runSegment(queue, later) {
     return new Promise((resolve) => {
       eventQueue = queue.slice();
@@ -2108,7 +2005,7 @@
       conditionOrder: plan.order, conditionOrderSource: plan.orderSource, idBit: orderBit(session.participantId),
       idRandomPart: session.idRandomPart, adminMode: adminMode ? 1 : 0, transStyle: currentTransStyle(),
       startedAt: session.startedAt, stressMode: CONFIG.STRESS_MODE, responseAckMs: CONFIG.RESPONSE_ACK_MS, probeAckMs: CONFIG.PROBE_ACK_MS,
-      showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0, endMath: CONFIG.END_MATH ? 1 : 0,
+      showSummary: CONFIG.SHOW_SUMMARY ? 1 : 0,
       wordingVersion: CONFIG.WORDING_VERSION,
       decisionLimitMs: liveDecisionLimitMs,
       decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE ? 1 : 0,
@@ -2121,7 +2018,7 @@
     return { practice, condQueues, conds };
   }
 
-  /* v5.3: small screens and touch-only devices are blocked (no "you may still begin"). */
+  /* Small screens and touch-only devices are blocked (no "you may still begin"). */
   const MIN_VIEWPORT_W = 1000;
   function deviceBlocked() {
     if (params.get("allowSmall") === "1") return false; // tests / experimenter only
@@ -2306,12 +2203,6 @@
     return true;
   }
 
-  async function stepExperimenter(title, text, evt) {
-    setPhase(evt);
-    await page(`<h2>${escapeHtml(title)}</h2><p class="exp-note">${escapeHtml(text)}</p>`, [{ id: "ok", label: "Continue" }]);
-    logEvent(evt + "_done");
-  }
-
   async function stepTaskInstructions() {
     setPhase("task_instructions");
     showScreen("instructions");
@@ -2324,7 +2215,7 @@
       btn.textContent = "Start practice";
       btn.disabled = false;
       const rs = readDelaySeconds(wordCount($("screen-instructions")));
-      if (rs > 0) startReadCountdown(btn, rs, "task_instructions"); // v5.2: read first, then the button enables
+      if (rs > 0) startReadCountdown(btn, rs, "task_instructions"); // read first, then the button enables
     } catch (err) {
       if (st) {
         st.hidden = false;
@@ -2352,83 +2243,6 @@
     throwIfAbort();
   }
 
-  async function stepLiveStress() {
-    setPhase("stress_instructions");
-    await page(`<h2>Arithmetic task</h2>
-      <p>In the next task you will count backwards from <strong>${CONFIG.STRESS.START}</strong> in steps of <strong>${CONFIG.STRESS.STEP}</strong>.</p>
-      <p>Type each answer and press Enter. Please answer as quickly and accurately as you can. There is a time limit for each answer.
-      If you make a mistake or run out of time, you will start again from ${CONFIG.STRESS.START}.</p>
-      <p>The task lasts about ${Math.max(1, Math.round(CONFIG.STRESS.DURATION_S / 60))} minute(s).</p>
-      ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}). Legacy live-stress module (?liveStress=1).</p>` : ""}`,
-      [{ id: "go", label: "Start" }]);
-    setPhase("stress_induction", { config: CONFIG.STRESS });
-    showScreen("page");
-    session.stress.live = await window.WFStress.run(pageHost(), CONFIG.STRESS, (t, x) => logEvent(t, x));
-    autosave("stress");
-  }
-
-  async function stepPrep(variant) {
-    setPhase(variant === "first" ? "prep_1" : "prep_2", { variant, duration_s: CONFIG.PREP_S });
-    showScreen("page");
-    const result = await window.WFStress.runPrep(pageHost(), {
-      DURATION_S: CONFIG.PREP_S, variant, wordingVersion: CONFIG.WORDING_VERSION,
-    }, (t, x) => logEvent(t, x));
-    session.stress.preps.push(result);
-    autosave("prep_" + variant);
-  }
-
-  function mistCfg(extra) {
-    return Object.assign({
-      DURATION_S: CONFIG.MIST_S,
-      PRACTICE_S: CONFIG.MIST_PRACTICE_S,
-      AVERAGE_PCT: CONFIG.MIST_AVG,
-      EVAL_MESSAGES: CONFIG.MIST_EVAL_MESSAGES,
-      wordingVersion: CONFIG.WORDING_VERSION,
-      seed: (session.seed || 1) * 10007,
-      state: session.stress.mist.state,
-    }, extra || {});
-  }
-
-  async function stepMist(variant) {
-    const first = variant === "first";
-    const draft = document.body.classList.contains("debug")
-      ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}). MIST-style task after Dedovic et al. (2005). Experimenter: Esc skips a segment.</p>`
-      : "";
-    if (first) {
-      setPhase("mist_instructions_1");
-      const practiceNote = CONFIG.MIST_PRACTICE_S > 0
-        ? `<p>First you will have a short practice with no time limit. After that, each problem will be timed.</p>`
-        : `<p>Each problem will be timed.</p>`;
-      await page(`<h2>Mental arithmetic</h2>
-        <p>You will now complete a short mental arithmetic task. Solve each problem in your head and enter a single-digit answer (0–9) by clicking a number on the dial or pressing a number key.</p>
-        ${practiceNote}
-        <p>Please work as quickly and accurately as you can.</p>
-        ${draft}`, [{ id: "go", label: CONFIG.MIST_PRACTICE_S > 0 ? "Start practice" : "Start" }]);
-      if (CONFIG.MIST_PRACTICE_S > 0 && !session.stress.mist.practice) {
-        setPhase("mist_practice", { duration_s: CONFIG.MIST_PRACTICE_S });
-        showScreen("page");
-        session.stress.mist.practice = await window.WFStress.runMist(pageHost(), mistCfg({ phase: "practice", variant: "practice" }), (t, x) => logEvent(t, x));
-        autosave("mist_practice");
-      }
-      setPhase("mist_ready_1");
-      await page(`<h2>Timed problems</h2>
-        <p>The timed arithmetic task will now begin. Each problem has a time limit. A bar will show your performance compared with average performance.</p>
-        <p>Please work as quickly and accurately as you can.</p>
-        ${draft}`, [{ id: "go", label: "Start" }]);
-    } else {
-      setPhase("mist_instructions_2");
-      await page(`<h2>Mental arithmetic</h2>
-        <p>You will now complete the mental arithmetic task again. Each problem is timed. Please work as quickly and accurately as you can.</p>
-        ${draft}`, [{ id: "go", label: "Start" }]);
-    }
-    const phaseName = first ? "mist_1" : "mist_2";
-    setPhase(phaseName, { variant: variant, duration_s: CONFIG.MIST_S, average_pct: CONFIG.MIST_AVG });
-    showScreen("page");
-    const seg = await window.WFStress.runMist(pageHost(), mistCfg({ phase: "experimental", variant: variant }), (t, x) => logEvent(t, x));
-    session.stress.mist.segments.push(seg);
-    autosave(phaseName);
-  }
-
   function dstCfg(extra) {
     return Object.assign({
       DURATION_S: CONFIG.DST_S,
@@ -2443,7 +2257,7 @@
 
   async function stepDst(variant) {
     const first = variant === "first";
-    const listId = "generated"; // v5.0: per-participant generated items (Norden et al. 2022); was fixed lists A/B
+    const listId = "generated";
     const antPhase = first ? "dst_anticipation_1" : "dst_anticipation_2";
     const cdPhase = first ? "dst_countdown_1" : "dst_countdown_2";
     const mathPhase = first ? "dst_1" : "dst_2";
@@ -2476,25 +2290,13 @@
     }
   }
 
-  /** Default: DST. Legacy MIST (?legacyMist=1), anticipatory prep (?prep=1) or live subtraction (?liveStress=1). */
   async function stepInduction(variant) {
-    if (CONFIG.STRESS_MODE === "dst") {
-      await stepDst(variant);
-    } else if (CONFIG.STRESS_MODE === "mist") {
-      await stepMist(variant);
-    } else if (CONFIG.STRESS_MODE === "live") {
-      // The live module is used at the first induction point; the second point stays anticipatory.
-      if (variant === "first") await stepLiveStress();
-      else await stepPrep(variant);
-    } else {
-      await stepPrep(variant);
-    }
+    await stepDst(variant);
   }
 
   async function stepDebrief() {
     const copy = (window.WFStress && window.WFStress.DEBRIEF_COPY) || { title: "Debriefing", html: "<p>[PLACEHOLDER: IRB-approved debrief text.]</p>" };
     setPhase("debrief");
-    // v5.2: no "Exclude my data" option here (participants have already consented).
     const btn = await page(`<h2>${copy.title}</h2>${copy.html}`, [
       { id: "go", label: "Continue" },
     ], { cls: "debrief-page" });
@@ -2508,7 +2310,7 @@
     }
     session.stress.debriefShown = true;
     logEvent("debrief_shown", { wordingVersion: CONFIG.WORDING_VERSION, stressMode: CONFIG.STRESS_MODE });
-    showEndView("loading"); // v5.2: saving/computing takes a moment, so show a loading screen straight away
+    showEndView("loading");
     // Await so this checkpoint cannot race/overwrite the final "complete" save on Drive.
     await autosave("debrief");
   }
@@ -2601,7 +2403,7 @@
     return list;
   }
 
-  /** v5.2 compact results: 4 small boxes (overall, both parts). Summaries are still stored per condition/block for the raw data. */
+  /** Compact results: 4 small boxes (overall, both parts). Summaries are still stored per condition/block for the raw data. */
   function compactResultsHTML(stats) {
     const box = (val, lbl) => `<div class="perf-stat"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`;
     const nd = stats.n_decisions;
@@ -2648,39 +2450,6 @@
     autosave("condition_" + pos);
   }
 
-  async function stepEndMath() {
-    if (!CONFIG.END_MATH) return;
-    setPhase("end_math_instructions");
-    await page(`<h2>Arithmetic task</h2>
-      <p>You will now complete the short mental arithmetic task you prepared for.</p>
-      <p>Count backwards from <strong>${CONFIG.STRESS.START}</strong> in steps of <strong>${CONFIG.STRESS.STEP}</strong>.
-      Type each answer and press Enter. The task is timed and scored, and lasts about ${Math.max(1, Math.round(CONFIG.END_MATH_S / 60))} minute(s).
-      Please work as quickly and accurately as you can.</p>
-      ${document.body.classList.contains("debug") ? `<p class="exp-note draft-note">DRAFT wording (${CONFIG.WORDING_VERSION}). No failure feedback.</p>` : ""}`,
-      [{ id: "go", label: "Start" }]);
-    setPhase("end_math", { duration_s: CONFIG.END_MATH_S });
-    showScreen("page");
-    session.stress.endMath = await window.WFStress.runQuiet(pageHost(), {
-      START: CONFIG.STRESS.START, STEP: CONFIG.STRESS.STEP, DURATION_S: CONFIG.END_MATH_S,
-    }, (t, x) => logEvent(t, x));
-    autosave("end_math");
-  }
-
-  async function stepInterview() {
-    if (!CONFIG.INTERVIEW) return;
-    setPhase("interview");
-    const btn = await page(`<h2>Post-session interview (optional, experimenter)</h2>
-      <p class="exp-note">Ask the participant, then type brief notes. Do not record names or other identifying details.</p>
-      <div class="field"><label for="iv-q1">1. Which part (condition) did you find easier, and why?</label><textarea id="iv-q1" rows="3"></textarea></div>
-      <div class="field"><label for="iv-q2">2. What helped you find your way?</label><textarea id="iv-q2" rows="3"></textarea></div>
-      <div class="field"><label for="iv-q3">Other notes</label><textarea id="iv-q3" rows="2"></textarea></div>`,
-      [{ id: "save", label: "Save notes and continue" }, { id: "skip", label: "Skip", cls: "secondary" }]);
-    session.interview = btn === "skip" ? { skipped: true, timestamp: isoNow() } : {
-      skipped: false, timestamp: isoNow(), prompts_version: "DRAFT wording (confirm with Moj)",
-      q1_easier_condition: $("iv-q1").value, q2_what_helped: $("iv-q2").value, notes: $("iv-q3").value };
-    logEvent("interview_" + (btn === "skip" ? "skipped" : "saved"));
-  }
-
   async function runSession() {
     let s = null;
     let cursor = "setup";
@@ -2708,12 +2477,6 @@
           setPhase("baseline");
           await surveySet(["VAS", "IPANAS", "STICSA_T"], "baseline");
           throwIfAbort();
-          if (mode === "lab") {
-            await stepExperimenter("Equipment setup", "Experimenter: fit and check the EEG/ECG equipment, then press Continue.", "equipment_setup");
-            throwIfAbort();
-            setPhase("rest_baseline"); await restScreen("baseline", CONFIG.REST_BASELINE_S);
-            throwIfAbort();
-          }
           cursor = "instructions";
         } else if (cursor === "instructions") {
           await stepTaskInstructions();
@@ -2725,8 +2488,8 @@
           setPhase("practice");
           await runSegment(s.practice, s.condQueues.map((c) => c.queue));
           throwIfAbort();
-          cursor = "mist";
-        } else if (cursor === "mist") {
+          cursor = "dst";
+        } else if (cursor === "dst") {
           s = s || ensureSessionStarted(s);
           await stepInduction("first");
           throwIfAbort();
@@ -2750,8 +2513,6 @@
             { condition: c.condition, conditionName: COND_LABEL[c.condition], conditionPosition: 1 });
           throwIfAbort();
           if (s.condQueues.length > 1) {
-            if (CONFIG.REST_BETWEEN_S) { setPhase("rest_between"); await restScreen("between_conditions", CONFIG.REST_BETWEEN_S); }
-            throwIfAbort();
             await stepInduction("second");
             throwIfAbort();
             setPhase("post_mist_2");
@@ -2777,13 +2538,8 @@
           setPhase("post_experiment");
           await surveySet(["SBSOD", "SAS", "EHI", "DEMO", "NR6"], "post_experiment");
           throwIfAbort();
-          // MRT: UNDECIDED (CONFIG.MRT = "pending"). Disabled module slot; no MRT items are included in v4.
           if (CONFIG.MRT !== "pending") logEvent("mrt_slot", { status: CONFIG.MRT });
           else logEvent("mrt_slot", { status: "pending_disabled" });
-          await stepEndMath();
-          throwIfAbort();
-          await stepInterview();
-          throwIfAbort();
           await stepDebrief();
           throwIfAbort();
           cursor = "results";
@@ -2821,7 +2577,7 @@
           continue;
         }
         if (!e || !e.adminJump) throw e;
-        const j = e.adminJump;
+        const j = (e.adminJump === "mist") ? "dst" : e.adminJump;
         pendingJump = null;
         skipConditionFlag = false;
         s = s || ensureSessionStarted(s);
@@ -2844,7 +2600,7 @@
     return seen;
   }
 
-  /* v5.2 end flow: loading screen -> compact results -> Continue -> final "saved" page */
+  /* End flow: loading screen -> compact results -> Continue -> final "saved" page */
   const END_VIEWS = ["loading", "results", "final"];
   function showEndView(name) {
     const scr = $("screen-end");
@@ -2955,7 +2711,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // v5.0: all export logic lives in js/export.js (shared with the node test). Local helpers only wrap it.
+  // all export logic lives in js/export.js (shared with the node test). Local helpers only wrap it.
   function stressRows() { return WFX.stressRows(session); }
   function summaryRows() {
     return (session.summaries || []).map((sm) => ({
@@ -2983,7 +2739,7 @@
       if (k === " " || k === "enter") { e.preventDefault(); dismissIntro(); }
       return;
     }
-    // v5.1: a second left/right press after a response was registered is ignored (first press counts) and logged
+    // a second left/right press after a response was registered is ignored (first press counts) and logged
     if ((k === "arrowleft" || k === "a" || k === "arrowright" || k === "d") && responding &&
         (currentEvent.kind === "decision" || currentEvent.kind === "probe")) {
       e.preventDefault();
@@ -3017,7 +2773,7 @@
     initAdminBar();
     if ($("btn-withdraw")) $("btn-withdraw").addEventListener("click", requestWithdraw);
     updateInstructionLimitCopy();
-    $("header-meta").textContent = "v5.6 · mode: " + mode + (adminMode ? " · DEMO" : "") +
+    $("header-meta").textContent = "v5.7 · mode: " + mode + (adminMode ? " · DEMO" : "") +
       " · " + currentTransStyle() + " · " + CONFIG.RES +
       (liveDecisionLimitMs ? " · " + decisionLimitLabel() : " · no limit");
     if (mode === "lab") $("lab-banner").classList.add("visible");
@@ -3067,9 +2823,9 @@
         get adminMode() { return adminMode; }, requestJump, requestSkip, requestWithdraw,
         currentDecisionLimitMs, setLiveDecisionLimitMs, startDecisionLimit, recordDecisionTimeout, collectSummaries };
     }
-    console.log("[wayfinding v5.6] ready", { mode, abstract: CONFIG.ABSTRACT_MODE, res: CONFIG.RES,
-      trialsPerBlock: CONFIG.TRIALS_PER_BLOCK, stressMode: CONFIG.STRESS_MODE,
-      showSummary: CONFIG.SHOW_SUMMARY, endMath: CONFIG.END_MATH, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, mistSec: CONFIG.MIST_S, transMs: CONFIG.TRANS_MS,
+    console.log("[wayfinding v5.7] ready", { mode,
+      trialsPerBlock: CONFIG.TRIALS_PER_BLOCK,
+      showSummary: CONFIG.SHOW_SUMMARY, dstSec: CONFIG.DST_S, dstLimitMs: CONFIG.DST_LIMIT_MS, transMs: CONFIG.TRANS_MS,
       transStyle: currentTransStyle(), adminMode: adminMode, decisionLimitMs: liveDecisionLimitMs,
       decisionLimitInPractice: CONFIG.DECISION_LIMIT_IN_PRACTICE });
     runSession().catch((err) => { console.error("[session]", err); logEvent("session_error", { message: String(err && err.message) }); });

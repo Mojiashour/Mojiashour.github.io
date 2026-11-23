@@ -1,27 +1,18 @@
 /**
- * v4.3 pluggable data backend.
+ * Data backend for the Hospital Wayfinding Study (v5.7).
  *
  * The experiment is a static HTML/JS app (GitHub Pages has no server). Saves always
- * go to localStorage first. A backend adapter then POSTs the participant's files
- * at checkpoints and at the end. If the remote save fails, the end screen offers a
- * local download.
+ * go to localStorage first. This module then POSTs the participant's files to a
+ * Google Apps Script web app (text/plain body, shared token, retries). In lab
+ * mode, tools/server.py can also receive a local copy at /api/save. If the remote
+ * save fails, the end screen offers a local download.
  *
  * Configure with assets/backend-config.json or window.WF_BACKEND_CONFIG.
- * Do not put Google passwords, Box tokens, or service-account keys in either place.
+ * Do not put Google passwords or service-account keys in either place. The shared
+ * token is visible in the client and only authorizes upload, not read access.
  *
- * Adapters
- *   auto       — try local (tools/server.py POST /api/save), then gas / remote / box / datapipe
- *   local      — POST /api/save (lab / tools/server.py)
- *   gas        — Google Apps Script web app → Cornell Google Drive (PRIMARY for online)
- *                text/plain POST, shared-token in the body, follows Apps Script 302 echo,
- *                CORS then no-cors fallback, retries; also best-effort local save for lab
- *   remote_post — POST cfg.endpoint as JSON (generic relay)
- *   box_relay  — same wire format as remote_post, for a Box JWT/CCG relay URL
- *   datapipe   — POST each file to pipe.jspsych.org/api/data/ (needs experimentId)
- *   none       — skip remote save (download fallback only)
- *
- * WFBackend.save(payload) -> Promise<{ok, adapter, error, unconfirmed}>
- * WFBackend.register(name, fn) to add an adapter without editing this file.
+ * Adapters: gas (default online), local (lab server), auto (gas + best-effort local),
+ * none (download fallback only). WFBackend.save(payload) -> Promise.
  */
 (function () {
   "use strict";
@@ -32,7 +23,6 @@
     experimentId: "",
     token: "",
     localPath: "api/save",
-    datapipeUrl: "https://pipe.jspsych.org/api/data/",
     headers: {},
     timeoutMs: 20000,
     retries: 3,
@@ -182,63 +172,6 @@
       return { ok: true, adapter: "gas", unconfirmed: !!result.unconfirmed, detail: result.json };
     },
 
-    async remote_post(payload, cfg) {
-      if (!cfg.endpoint) throw new Error("remote_post_no_endpoint");
-      const json = await postJson(cfg.endpoint, {
-        token: cfg.token || "",
-        participantId: payload.participantId,
-        reason: payload.reason,
-        files: payload.files,
-        meta: payload.meta || {},
-        experimentId: cfg.experimentId || "",
-      }, cfg);
-      return { ok: true, adapter: "remote_post", detail: json };
-    },
-
-    /**
-     * Box relay: POST JSON to a server-side relay that holds Box JWT/CCG credentials.
-     * The browser never talks to api.box.com and never holds Box secrets.
-     */
-    async box_relay(payload, cfg) {
-      if (!cfg.endpoint) throw new Error("box_relay_no_endpoint");
-      const json = await postJson(cfg.endpoint, {
-        token: cfg.token || "",
-        participantId: payload.participantId,
-        reason: payload.reason,
-        files: payload.files,
-        meta: payload.meta || {},
-        experimentId: cfg.experimentId || "",
-        target: "box",
-      }, cfg);
-      return { ok: true, adapter: "box_relay", detail: json };
-    },
-
-    async datapipe(payload, cfg) {
-      if (!cfg.experimentId) throw new Error("datapipe_no_experimentId");
-      const url = cfg.datapipeUrl || "https://pipe.jspsych.org/api/data/";
-      const reason = String(payload.reason || "save").replace(/[^\w.-]/g, "_");
-      const isEnd = reason === "end";
-      // DataPipe filenames must be unique and cannot be overwritten. Send the full
-      // set at the end; at checkpoints send only the session JSON under a unique name.
-      const entries = isEnd
-        ? Object.entries(payload.files)
-        : Object.entries(payload.files).filter(([name]) => name.endsWith("session.json"));
-      const uploaded = [];
-      for (const [name, data] of entries) {
-        const base = name.split("/").pop();
-        const filename = isEnd
-          ? (payload.participantId + "_" + base)
-          : (payload.participantId + "_" + reason + "_" + base);
-        await postJson(url, {
-          experimentID: cfg.experimentId,
-          filename,
-          data: typeof data === "string" ? data : JSON.stringify(data),
-        }, cfg);
-        uploaded.push(filename);
-      }
-      return { ok: true, adapter: "datapipe", files: uploaded };
-    },
-
     async none() {
       return { ok: false, adapter: "none", error: "disabled" };
     },
@@ -291,15 +224,7 @@
             throw e;
           }
         }
-        try {
-          return await tryOne("local");
-        } catch (e) {
-          if (!cfg.endpoint && !cfg.experimentId) throw e;
-          if (cfg.endpoint && (cfg.relayType === "box" || cfg.boxRelay)) return await tryOne("box_relay");
-          if (cfg.experimentId) return await tryOne("datapipe");
-          if (cfg.endpoint) return await tryOne("remote_post");
-          throw e;
-        }
+        return await tryOne("local");
       }
       if (name === "gas") {
         // Always write to Drive; also try local so lab mode with server.py keeps a disk copy.

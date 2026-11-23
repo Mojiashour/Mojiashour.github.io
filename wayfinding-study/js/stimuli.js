@@ -1,4 +1,5 @@
-/* v5.0: boards regenerated from sign-generator v1.6 (seed 20261007; 10 department rows + Exit; single-word names) by tools/make_stimuli.js. signOverlay unchanged from v4. Do not hand-edit. */
+/* Sign-board table and overlay geometry for the Hospital Wayfinding Study (v5.7).
+   Generated from the sign-generator (seed 20261007). Do not hand-edit the board list. */
 window.WF_STIMULI = {
  "boardSeed": 20261007,
  "boards": [
@@ -1401,7 +1402,7 @@ window.WF_STIMULI = {
    ],
    "standoff_m": 0.15
   },
-  "board_fit_note": "Default boardFit=panel: sign-generator v1.5 panel-format boards (assets/boards_panel/, 1400x1600, 7:8) drawn at full panel height = 1.1996 x 1.371 m, filling the panel without stretching. Legacy v1.4 2:3 boards (assets/boards/, 1200x1800): ?boardFit=contain = full height, 0.914 m wide, centred (~14 cm panel each side); ?boardFit=stretch = fills the panel (text 31% wider, comparison only).",
+  "board_fit_note": "Panel-format boards (assets/boards_panel/, 1400x1600) fill the 1.20 x 1.371 m sign panel.",
   "points": {
    "top_left": {
     "yaw_deg": -8.858,

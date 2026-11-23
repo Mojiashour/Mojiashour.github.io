@@ -1,20 +1,17 @@
 /**
- * v5.3 export: 4 VAS columns (vas_stressed/frustrated/overstrained/ashamed), I-PANAS-SF items + PA/NA, STICSA Trait only
- * (State columns dropped), attention checks (attn_*), NR-6, MENE nature items + nature_visit_weekly, no free-text demographics,
- * adaptive DST columns (next_limit_ms, adapt_event, keypad_shuffled, keypad_layout, easy_item).
- * v5.0 data export (v5.2: DEM_occupation no longer collected; sleep hours / age exported from dropdowns, sleep "More than 14" = 15). Pure functions (no DOM), shared by the app (window.WF_EXPORT) and the node test (module.exports).
+ * Data export for the Hospital Wayfinding Study (v5.7).
  *
- * Per participant the export is:
- *   <pid>_questionnaires.csv   long format, one row per questionnaire timepoint (13 rows in a complete session)
- *   <pid>_trials.csv           one row per test decision or recall probe (practice excluded)
- *   raw/<pid>_session.json     full session object (superset of everything)
- *   raw/<pid>_events.csv       event log
- *   raw/<pid>_dst_items.csv    item-level arithmetic (DST) task
- *   raw/<pid>_questionnaire_items.csv   item-level questionnaire rows with timings
- * (raw/last_save.json is written by the Apps Script backend.)
+ * For each participant:
+ *   <id>_questionnaires.csv   one row per questionnaire timepoint
+ *   <id>_trials.csv           one row per test decision or recall probe (practice excluded)
+ *   raw/<id>_session.json     full session object
+ *   raw/<id>_events.csv       event log
+ *   raw/<id>_dst_items.csv    item-level arithmetic-task data
+ *   raw/<id>_questionnaire_items.csv   item-level questionnaire rows with timings
  *
- * File names that start with "raw/" are put in a raw subfolder by the Apps Script backend, tools/server.py and
- * the zip download. Internal logic (plan.order codes, session.trials, ...) is unchanged; only labels are mapped here.
+ * Condition order is written as Nature_first / Poster_first. A file name that
+ * starts with "raw/" is placed in a raw subfolder by the Apps Script backend,
+ * the local save server, and the zip download.
  */
 (function (root) {
   "use strict";
@@ -63,7 +60,6 @@
 
   const DEM_IDS = ["DEM_age", "DEM_gender", "DEM_education", "DEM_race", "DEM_english",
     "DEM_hospfamiliar", "DEM_hospvisits", "DEM_healthcarework", "DEM_videogames", "DEM_vrexp", "DEM_nature_visit", "DEM_nature_media"];
-  // v5.3: no free-text "other" fields are collected any more (gender/race "Others" has no text box; English is Yes/No).
   const WEEKLY = ["more_than_once_day", "every_day", "several_times_week", "once_week"];
 
   const PARTICIPANT_COLS = ["participant_id", "app_version", "seed", "cond_order", "order_source", "end_reason", "exclude_flag"]
@@ -261,7 +257,6 @@
     "conditionPosition", "block", "blockOrder", "destination", "instrument", "itemId", "itemPosition", "value", "valueLabel", "nChanges",
     "page_onset_perf", "first_response_perf", "last_response_perf", "rt_ms", "submit_perf",
     "first_response_time", "last_response_time", "submit_time", "itemText", "vasMoved", "pages_total"];
-  // v4.9 stress columns without the dead ones (difficulty, level, previous, next_limit_ms, next_level)
   const DST_ITEM_HEADERS = ["participantId", "task", "phase", "variant", "list_id", "idx", "item_index", "problem",
     "operand_a", "operand_b", "operator", "source", "expected", "given", "correct", "timeout", "feedback",
     "rt_ms", "limit_ms", "next_limit_ms", "adapt_event", "keypad_shuffled", "keypad_layout", "easy_item", "cutoff_reason", "your_pct", "average_marker", "onset_perf", "response_perf", "elapsed_ms", "timestamp"];
@@ -272,11 +267,6 @@
       if (!res || !res.responses) return;
       res.responses.forEach((r) => rows.push(Object.assign({ participantId: session.participantId, task }, r)));
     };
-    add(session.stress && session.stress.live, "live");
-    add(session.stress && session.stress.endMath, "end_math");
-    const mist = session.stress && session.stress.mist;
-    if (mist && mist.practice) add(mist.practice, "mist");
-    ((mist && mist.segments) || []).forEach((seg) => add(seg, "mist"));
     const dst = session.stress && session.stress.dst;
     ((dst && dst.segments) || []).forEach((seg) => add(seg, "dst"));
     return rows;

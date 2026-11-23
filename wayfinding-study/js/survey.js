@@ -1,12 +1,11 @@
 /**
- * v4.2 survey renderer. WFSurvey.run(host, instrument, ctx) -> Promise<{rows, values, presentedOrder}>
- *  - long instruments are split into pages of about 5–6 items, with Next / Continue
- *  - required items on the current page must be answered before continuing
- *  - per item: value, first/last response time (performance.now + ISO), number of changes
- *  - VAS: continuous 0–100 slider, no numbers/ticks; track is always visible, thumb hidden
- *    until the first click (unbiased). A "click on the line" prompt is shown. Movement is logged.
- *  - Matrix option columns have equal width; long labels wrap (e.g. Strongly / agree)
- *  - SAM: 9 points, official figures from assets/sam/<dim>_<1..5>.png if present, else a labelled placeholder
+ * Questionnaire renderer for the Hospital Wayfinding Study (v5.7).
+ *
+ * WFSurvey.run(host, instrument, ctx) returns a Promise of {rows, values, presentedOrder}.
+ * Long instruments are split into pages of about 5–6 items. Required items on the
+ * current page must be answered before continuing. Each item records its value,
+ * first and last response times, and the number of changes. VAS sliders are
+ * continuous 0–100 with no numbers or ticks; the thumb appears after the first click.
  */
 (function () {
   "use strict";
@@ -260,11 +259,11 @@
                 sec.options.map((o) => `<td><label class="cell"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"></label></td>`).join("") + "</tr>";
               return;
             }
-            html += `<div class="q" data-item="${it.id}">` + (it.hideText ? "" : `<div class="qtext">${it.type === "sam" ? "" : num} ${formatItemText(it)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`);
+            html += `<div class="q" data-item="${it.id}">` + (it.hideText ? "" : `<div class="qtext">${num} ${formatItemText(it)}${it.note ? ` <span class="qnote">(${esc(it.note)})</span>` : ""}</div>`);
             if (it.hint) html += `<div class="qhint">${esc(it.hint)}</div>`;
             const opts = it.options || sec.options;
             if (it.type === "choice" && it.display === "hscale") {
-              // v5.4: 1-N scale and "I prefer not to answer" live in the same question block, PNA directly under the scale
+              // 1-N scale and "I prefer not to answer" live in the same question block, PNA directly under the scale
               const pts = opts.filter((o) => String(o.v) !== "pna"), pna = opts.find((o) => String(o.v) === "pna");
               html += `<div class="hscale-block"><div class="hscale"><span class="hs-end">${esc(it.endLabels[0])}</span><div class="hs-pts">` + pts.map((o) =>
                 `<label class="hs-pt"><input type="radio" name="${it.id}" value="${esc(o.v)}" aria-label="${esc(o.label)}"><span>${esc(o.label)}</span></label>`).join("") +
@@ -294,16 +293,6 @@
               html += `${inst.id !== "VAS" && vasN++ === 0 ? '<p class="vas-prompt">Click on the line and drag to indicate your rating</p>' : ""}
                 <div class="vas untouched" data-vas="${it.id}"><div class="vas-track" role="slider" aria-label="${esc(it.text)}" aria-valuemin="0" aria-valuemax="100"><div class="vas-thumb"></div></div>
                 <div class="vas-ends"><span>${esc(it.left)}</span><span>${esc(it.right)}</span></div></div>`;
-            } else if (it.type === "sam") {
-              let figs = "";
-              for (let k = 1; k <= 9; k++) {
-                const fig = k % 2 === 1 ? (k + 1) / 2 : 0;
-                figs += `<label class="sam-pt ${fig ? "fig" : "between"}"><span class="sam-fig">` +
-                  (fig && inst.samImages ? `<img src="assets/sam/${it.dim}_${fig}.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sam-missing',textContent:'SAM figure ${fig}'}))">` :
-                    fig ? `<span class="sam-missing">SAM figure ${fig} (pending)</span>` : "") +
-                  `</span><input type="radio" name="${it.id}" value="${k}" aria-label="${k}"><span class="sam-k">${k}</span></label>`;
-              }
-              html += `<div class="sam">${figs}</div><div class="vas-ends sam-ends"><span>${esc(it.left)}</span><span>${esc(it.right)}</span></div>`;
             }
             html += `</div>`;
           });
